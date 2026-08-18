@@ -60,7 +60,12 @@ async function runInvestigation(event) {
   $('#evidence-empty').hidden = false;
   progress.hidden = false;
 
-  for (const step of ['Connecting to Grafana MCP…', 'Querying pipeline metrics…', 'Correlating encoder logs…', 'Ranking recovery options…']) {
+  for (const step of [
+    'Loading replayed Grafana capture…',
+    'Replaying pipeline metrics…',
+    'Replaying encoder log correlation…',
+    'Ranking recovery options…'
+  ]) {
     label.textContent = step;
     await wait(330);
   }
