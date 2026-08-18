@@ -34,6 +34,7 @@ test('summarizes pipeline state without hiding blocked stages', () => {
     degraded: 1,
     failed: 1,
     waiting: 1,
+    unknown: 0,
     total: 6,
   });
 });

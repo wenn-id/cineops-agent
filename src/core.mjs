@@ -53,7 +53,7 @@ export function investigateIncident(incident, query = 'What is blocking this pro
     : 0;
 
   const topSignal = evidence[0] || { stage: 'unknown', finding: 'Unknown finding' };
-  const targetStage = failedStage?.id ?? topSignal.stage;
+  const targetStage = topSignal.stage;
 
   const playbooks = {
     transcode: {
