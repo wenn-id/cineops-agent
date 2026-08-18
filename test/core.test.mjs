@@ -13,7 +13,7 @@ test('investigates transcode failure with ranked Grafana evidence', () => {
   assert.equal(result.severity, 'critical');
   assert.equal(result.status, 'root_cause_identified');
   assert.equal(result.rootCause.stage, 'transcode');
-  assert.match(result.rootCause.finding, /GPU worker pool saturation/i);
+  assert.match(result.rootCause.finding, /Queue is 7.8× baseline/i);
   assert.ok(result.confidence >= 0.9);
   assert.deepEqual(
     result.evidence.map((item) => item.id),
@@ -34,6 +34,7 @@ test('summarizes pipeline state without hiding blocked stages', () => {
     degraded: 1,
     failed: 1,
     waiting: 1,
+    unknown: 0,
     total: 6,
   });
 });
@@ -42,6 +43,10 @@ test('rejects malformed incidents at trust boundary', () => {
   assert.throws(
     () => investigateIncident({ id: 'bad', stages: [] }),
     /incident title is required/i,
+  );
+  assert.throws(
+    () => investigateIncident({ title: 'bad', stages: [{id: 's', label: 'l', detail: 'd', status: 'healthy'}], signals: [{id: '1'}], toolCalls: undefined }),
+    /incident toolCalls are required/i,
   );
 });
 

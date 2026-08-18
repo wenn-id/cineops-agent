@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline';">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="CineOps Agent investigates incidents across media-production pipelines with Gemini and Grafana MCP.">
   <title>CineOps Agent — Production Incident Room</title>
@@ -13,7 +14,7 @@
   <div class="film-grain" aria-hidden="true"></div>
 
   <header class="topbar">
-    <a class="brand" href="#" aria-label="CineOps Agent home">
+    <a class="brand" aria-label="CineOps Agent home">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       <span><strong>CINEOPS</strong><small>AGENT</small></span>
     </a>
@@ -59,10 +60,16 @@
 
         <form id="investigation-form" class="prompt-box">
           <label for="operator-query">Ask CineOps</label>
-          <textarea id="operator-query" rows="3" maxlength="220">Can we still make the 21:00 premiere? Find the root cause and safest recovery path.</textarea>
+          <select id="operator-query">
+            <option value="" disabled selected>Select an investigation query…</option>
+            <option value="What is blocking this production pipeline?">What is blocking this production pipeline?</option>
+            <option value="Can we still make the 21:00 premiere? Find the root cause and safest recovery path.">Can we still make the 21:00 premiere? Find the root cause and safest recovery path.</option>
+            <option value="Is the CDN healthy?">Is the CDN healthy?</option>
+            <option value="Are subtitle workers falling behind?">Are subtitle workers falling behind?</option>
+          </select>
           <div>
             <span>Grafana MCP · read-only</span>
-            <button id="run-button" type="submit">Run investigation <b aria-hidden="true">↗</b></button>
+            <button id="run-button" type="submit">Run investigation <b aria-hidden="true">→</b></button>
           </div>
         </form>
 
@@ -71,7 +78,7 @@
         </div>
 
         <article id="agent-result" class="agent-result" hidden aria-live="polite">
-          <div class="result-kicker"><span>ROOT CAUSE IDENTIFIED</span><strong id="confidence">96% confidence</strong></div>
+          <div class="result-kicker"><span>ROOT CAUSE IDENTIFIED</span><strong id="confidence"></strong></div>
           <h3 id="root-cause"></h3>
           <p id="decision"></p>
           <ol id="actions" class="actions"></ol>

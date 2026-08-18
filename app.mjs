@@ -7,7 +7,7 @@ const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => (
 
 function renderPipeline() {
   $('#pipeline-stages').innerHTML = scenario.stages.map((stage, index) => `
-    <li class="stage" data-status="${stage.status}">
+    <li class="stage" data-status="${escapeHtml(stage.status)}">
       <span class="stage-number">${String(index + 1).padStart(2, '0')}</span>
       <h3>${escapeHtml(stage.label)}</h3>
       <p>${escapeHtml(stage.detail)}</p>
@@ -24,7 +24,7 @@ function renderEvidence(result) {
       <header><span>${escapeHtml(item.source)} · ${escapeHtml(item.stage)}</span><strong>${escapeHtml(item.value)}${item.unit === '%' ? '%' : ` ${escapeHtml(item.unit)}`}</strong></header>
       <h3>${escapeHtml(item.label)}</h3>
       <p>${escapeHtml(item.finding)}</p>
-      <code title="${escapeHtml(item.query)}">${escapeHtml(item.query)}</code>
+      <code>${escapeHtml(item.query)}</code>
     </article>
   `).join('');
   $('#tool-calls').innerHTML = result.toolCalls.map((call, index) => `
@@ -46,36 +46,53 @@ const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolv
 async function runInvestigation(event) {
   event.preventDefault();
   const query = $('#operator-query').value.trim();
+  const label = $('#progress-label');
+  const progress = $('#agent-progress');
+
   if (!query) {
     $('#operator-query').focus();
+    progress.hidden = false;
+    label.textContent = 'Please select a query.';
     return;
   }
 
   const button = $('#run-button');
-  const progress = $('#agent-progress');
-  const label = $('#progress-label');
   button.disabled = true;
   $('#agent-result').hidden = true;
   $('#evidence-results').hidden = true;
   $('#evidence-empty').hidden = false;
   progress.hidden = false;
 
-  for (const step of ['Connecting to Grafana MCP…', 'Querying pipeline metrics…', 'Correlating encoder logs…', 'Ranking recovery options…']) {
-    label.textContent = step;
-    await wait(330);
-  }
+  try {
+    for (const step of ['Loading replayed Grafana capture…', 'Replaying pipeline metrics…', 'Replaying encoder log correlation…', 'Ranking recovery options…']) {
+      label.textContent = step;
+      await wait(330);
+    }
 
-  const result = investigateIncident(scenario, query);
-  progress.hidden = true;
-  renderResult(result);
-  button.disabled = false;
-  button.textContent = 'Run again ↗';
+    const result = investigateIncident(scenario, query);
+    progress.hidden = true;
+    renderResult(result);
+  } catch (error) {
+    label.textContent = `Investigation failed: ${error.message}`;
+  } finally {
+    button.disabled = false;
+    button.innerHTML = 'Run again <b aria-hidden="true">→</b>';
+  }
+}
+
+function parseTime(timeStr) {
+  const [hh, mm] = timeStr.split(' ')[0].split(':').map(Number);
+  return hh * 3600 + mm * 60;
 }
 
 function startCountdown() {
-  let seconds = 48 * 60;
-  window.setInterval(() => {
-    seconds = Math.max(0, seconds - 1);
+  let seconds = parseTime(scenario.deadline) - parseTime(scenario.startedAt);
+  const intervalId = window.setInterval(() => {
+    if (seconds <= 0) {
+      window.clearInterval(intervalId);
+      return;
+    }
+    seconds -= 1;
     const hours = String(Math.floor(seconds / 3600)).padStart(2, '0');
     const minutes = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
     const remainingSeconds = String(seconds % 60).padStart(2, '0');
