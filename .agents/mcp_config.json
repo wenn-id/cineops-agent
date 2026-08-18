@@ -3,7 +3,7 @@
     "grafana": {
       "serverUrl": "https://mcp.grafana.com/mcp",
       "headers": {
-        "X-Grafana-URL": "https://breezycurlew2764.grafana.net"
+        "X-Grafana-URL": "${GRAFANA_URL}"
       }
     }
   }

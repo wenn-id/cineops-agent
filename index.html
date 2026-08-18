@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="CineOps Agent investigates incidents across media-production pipelines with Gemini and Grafana MCP.">
   <title>CineOps Agent — Production Incident Room</title>
@@ -59,7 +60,7 @@
 
         <form id="investigation-form" class="prompt-box">
           <label for="operator-query">Ask CineOps</label>
-          <textarea id="operator-query" rows="3" maxlength="220">Can we still make the 21:00 premiere? Find the root cause and safest recovery path.</textarea>
+          <select id="operator-query" class="operator-query" style="width:100%; background:transparent; color:var(--paper); border:none; outline:none; padding:14px 18px; font: 400 clamp(1.05rem, 1.6vw, 1.4rem)/1.45 Georgia, serif;"><option>Can we still make the 21:00 premiere? Find the root cause and safest recovery path.</option></select>
           <div>
             <span>Grafana MCP · read-only</span>
             <button id="run-button" type="submit">Run investigation <b aria-hidden="true">↗</b></button>
@@ -71,7 +72,7 @@
         </div>
 
         <article id="agent-result" class="agent-result" hidden aria-live="polite">
-          <div class="result-kicker"><span>ROOT CAUSE IDENTIFIED</span><strong id="confidence">96% confidence</strong></div>
+          <div class="result-kicker"><span>ROOT CAUSE IDENTIFIED</span><strong id="confidence"></strong></div>
           <h3 id="root-cause"></h3>
           <p id="decision"></p>
           <ol id="actions" class="actions"></ol>

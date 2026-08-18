@@ -1,0 +1,540 @@
+ISSUE 2
+title:	[H-1] investigateIncident returns a hardcoded verdict, not a derived one
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	bug, documentation
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	2
+--
+**Severity: High**
+
+## Problem
+
+`src/core.mjs:48-60` — `rootCause.finding`, `decision`, and all three `actions` are string literals. They are returned unchanged for any input, so the function named `investigateIncident` does not derive its conclusion from the incident it is given.
+
+## Evidence
+
+A completely unrelated incident (subtitle pod crash-looping, no transcode stage at all) returns the transcode verdict verbatim:
+
+```
+input : INC-999 "Subtitle service down", single failed stage 'subtitles',
+        single signal 'Subtitle pod is crash-looping.'
+
+output: rootCause.stage   -> "subtitles"    <-- adapts
+        rootCause.finding -> "GPU worker pool saturation caused the transcode
+                              queue to spike and encoder jobs to time out."
+        decision          -> "Premiere is at risk. Pause non-premiere 4K jobs
+                              and drain the priority queue before 20:32 UTC."
+        actions[0]        -> "Pause non-premiere 4K HEVC jobs."
+```
+
+Because `rootCause.stage` is the only field that adapts, the output is actively self-contradictory: it names the subtitle stage and then explains a GPU saturation failure.
+
+The only real computation in the function is one sort over a `score` field that is itself hand-authored in `src/scenarios.mjs`, so even the evidence ranking is a pre-decided ordering being replayed rather than a computed one.
+
+## Why it matters
+
+The README describes this as a "deterministic local investigator that ranks metrics and logs, identifies a root cause, and produces a recovery decision." Ranking is real. Identifying a root cause and producing a decision are not happening.
+
+## Two options
+
+1. **Rename to what it is.** `renderIncidentReplay` / `replayFixture`, and move `finding` / `decision` / `actions` into `src/scenarios.mjs` next to the rest of the fixture. ~20 minutes, removes the overclaim entirely.
+2. **Make it real.** Derive the finding from the top-ranked signal's stage and `finding` text, and select actions from a per-stage playbook keyed on the failed stage. Still deterministic, still offline, but the output would actually be a function of the input.
+
+Option 2 is the stronger demo; option 1 is the safer one if time is short. This is the one real judgement call in the repo.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 3
+title:	[H-3] Operator query is collected, validated, echoed, and then ignored
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	bug
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	3
+--
+**Severity: High**
+
+## Problem
+
+`src/core.mjs:36,44` — `query` is required by `requireText` and stored on the result object, but never read. The UI presents a 220-character textarea labelled "Ask CineOps", which implies the question shapes the answer.
+
+## Evidence
+
+Two opposite questions produce byte-identical analysis:
+
+```
+"Should we cancel the premiere entirely?"   -> every field except the
+"Is the CDN healthy?"                          echoed `query` is identical
+```
+
+## Test gap
+
+`test/core.test.mjs:44` is named `uses supplied operator question in investigation record`, but asserts only that the string round-trips. The suite passes while the feature is inert.
+
+## Suggested fix
+
+Either constrain the input to something honest — a preset dropdown of the questions actually supported — or remove the free-text box until the query genuinely influences the result. Pairs naturally with H-1 (#2).
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 4
+title:	[M-1] Trust boundary skips toolCalls, then crashes on it
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	bug
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	4
+--
+**Severity: Medium**
+
+## Problem
+
+`validateIncident` (`src/core.mjs:9-23`) checks `title`, `stages`, and `signals`, but not `toolCalls` — which `investigateIncident` then dereferences unconditionally at line 54.
+
+## Evidence
+
+```
+investigateIncident({ ...validIncident, toolCalls: undefined })
+-> TypeError: Cannot read properties of undefined (reading 'map')
+```
+
+A *validated* input reaches a raw `TypeError`, which defeats the purpose of having a validator at the trust boundary.
+
+## Test gap
+
+`test/core.test.mjs:38` is named `rejects malformed incidents at trust boundary` but only covers the missing-`title` case.
+
+## Suggested fix
+
+- Add `toolCalls` to `validateIncident` (array check), plus a regression test.
+- `stage.label` and `stage.detail` are also unvalidated despite being rendered.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 5
+title:	[M-2] Confidence is an unsourced magic number that can contradict severity
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	bug
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	5
+--
+**Severity: Medium**
+
+## Problem
+
+`src/core.mjs:40` computes confidence as `sum(top 3 scores) / 300`, capped at `0.99`. The `300` is an unexplained constant that assumes exactly three signals scored 0–100. Nothing enforces either assumption.
+
+## Evidence
+
+| Input | Reported | Problem |
+| --- | --- | --- |
+| 1 signal, score 100 | `0.33` confidence | A strong single signal reads as weak |
+| 3 signals, score 5 each | `0.05` confidence **and** `critical` severity | 5% confident and critical at once |
+
+Severity is derived from `failedStage` while confidence is derived from scores, so the two can disagree completely.
+
+## Suggested fix
+
+Name the constant and normalize against the evidence actually present:
+
+```js
+const MAX_EVIDENCE_SCORE = 100;
+const confidence = evidence.length
+  ? Math.min(0.99, Number((total / (evidence.length * MAX_EVIDENCE_SCORE)).toFixed(2)))
+  : 0;
+```
+
+Also: `index.html:74` ships `96% confidence` as static markup, so the fixture's answer flashes before any run. Leave it empty and let JS populate it.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 6
+title:	[M-3] A thrown error strands the UI permanently with no message
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	bug
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	6
+--
+**Severity: Medium**
+
+## Problem
+
+`runInvestigation` (`app.mjs:52-73`) has no `try`/`catch`/`finally`. Any throw between disabling and re-enabling the button leaves the UI permanently stuck.
+
+## Evidence
+
+Probed by removing a node the renderer writes to, then submitting:
+
+```
+buttonStillDisabled : true
+resultShown         : false
+userFacingMessage   : "Ranking recovery options…"
+```
+
+The button never re-enables, no error is surfaced, and the last thing the operator sees is a progress message. Only a page reload recovers.
+
+## Suggested fix
+
+Wrap the body in `try`/`catch`/`finally`, re-enable the button in `finally`, and surface the failure in the existing `aria-live` region so it is announced.
+
+Related: an empty-query submit is currently a silent no-op that only moves focus (`app.mjs:54-57`) — nothing is announced either. The same error channel would cover both.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 7
+title:	[M-4] summarizePipeline silently drops stages with unknown status
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	bug
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	7
+--
+**Severity: Medium**
+
+## Problem
+
+`summarizePipeline` (`src/core.mjs:26-35`) skips statuses outside its known set without incrementing `total`.
+
+## Evidence
+
+```
+summarizePipeline([{status:'healthy'},{status:'exploded'},{status:'failed'}])
+-> { healthy: 1, degraded: 0, failed: 1, waiting: 0, total: 2 }
+                                                     ^^^ 3 stages went in
+```
+
+## Why it matters
+
+For an incident-response tool this is the worst available failure mode: a stage in an unexpected state **vanishes** from the summary instead of being flagged. The operator sees a pipeline that looks smaller and healthier than it actually is.
+
+`test/core.test.mjs:28` is named `summarizes pipeline state without hiding blocked stages`, which is precisely the property this does not guarantee.
+
+## Suggested fix
+
+Count unrecognized statuses into `total` and expose an `unknown` bucket so they surface in the UI rather than disappearing.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 8
+title:	[M-5] No CI enforcing lint, test, or build
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	enhancement
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	8
+--
+**Severity: Medium**
+
+## Problem
+
+There is no `.github/workflows/` directory. `npm run lint`, `npm test`, and `npm run build` all pass locally and all three are fast and dependency-free, but nothing enforces them on push or PR.
+
+## Suggested fix
+
+A minimal workflow closes this:
+
+```yaml
+name: ci
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm run lint
+      - run: npm test
+```
+
+No `npm ci` step is needed while the dependency count is zero.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 9
+title:	[M-6] stage.status is interpolated into an attribute without escaping
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	bug
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	9
+--
+**Severity: Medium** (latent — not currently reachable)
+
+## Problem
+
+`app.mjs:10` interpolates `stage.status` into an HTML attribute without `escapeHtml`, unlike every other interpolation in the file.
+
+## Evidence
+
+Attribute breakout confirmed in principle:
+
+```
+status = 'healthy" data-injected="yes'
+-> <li class="stage" data-status="healthy" data-injected="yes">
+```
+
+## Reachability
+
+Not exploitable today: `src/scenarios.mjs` is static, local, and trusted. This is a latent defect rather than a live vulnerability — but it becomes real the moment stage data arrives from Grafana, which is the stated roadmap.
+
+Note also that `renderPipeline` reads the scenario directly and never calls `validateIncident`, so the status whitelist does not protect this path.
+
+## Suggested fix
+
+```js
+<li class="stage" data-status="${escapeHtml(stage.status)}">
+```
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 10
+title:	[L-1] Countdown is hardcoded, ignores scenario deadline, never clears
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	bug
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	10
+--
+**Severity: Low**
+
+## Problem
+
+`app.mjs:76-84` starts the countdown at a hardcoded `48 * 60` seconds on every page load, ignoring the fixture's own `startedAt: '20:12 UTC'` and `deadline: '21:00 UTC'` in `src/scenarios.mjs`. The displayed clock is therefore decorative and drifts from the scenario it claims to describe.
+
+It also keeps the interval running forever after reaching zero — `Math.max(0, ...)` clamps the displayed value but never calls `clearInterval`.
+
+## Suggested fix
+
+Derive the remaining time from the scenario's `startedAt`/`deadline` fields, and `clearInterval` once it hits zero.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 11
+title:	[L-2] Inter is specified in the font stack but never loaded
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	enhancement
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	11
+--
+**Severity: Low**
+
+## Problem
+
+`styles.css:15` leads the font stack with `Inter`, but no `@font-face` rule and no font `<link>` exists anywhere in the project. Machines without Inter installed locally fall back to `system-ui`.
+
+For a design-led entry this means the typography — and therefore the first impression — varies by the viewer's machine.
+
+## Suggested fix
+
+Either self-host a subset of Inter (woff2, `font-display: swap`) so the intended design is what everyone sees, or drop Inter and tune the design deliberately against the `system-ui` fallback.
+
+Related cosmetic issue: the `↗` glyph in the run button renders as a missing-glyph box under the `system-ui` fallback. A CSS-drawn arrow or a more widely supported glyph is safer.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 12
+title:	[L-3] dist/ is built by npm run build but consumed by nothing
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	enhancement
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	12
+--
+**Severity: Low**
+
+## Problem
+
+`scripts/build.mjs` copies five files into `dist/`, which is `.gitignore`d and consumed by nothing — GitHub Pages serves the repository root directly.
+
+The result is a build step that cannot break anything, because nothing depends on its output. It passes, but it verifies nothing.
+
+## Suggested fix
+
+Pick one:
+
+- Point GitHub Pages at `dist/` via a deploy workflow, making the build real.
+- Delete the script and the `build` npm script.
+
+Either is fine; the current middle state is just noise.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 13
+title:	[L-4] Private Grafana stack hostname committed in .agents/mcp_config.json
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	documentation, enhancement
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	13
+--
+**Severity: Low**
+
+## Problem
+
+`.agents/mcp_config.json` contains a hardcoded private Grafana Cloud stack hostname: `https://breezycurlew2764.grafana.net`.
+
+## Scope — no credential leak
+
+To be clear about what this is and is not: a scan of the **full git history** across all three commits found no API keys, tokens, or private keys. The README's claim that no credential is stored holds up. This is only the stack hostname.
+
+## Why it is still worth changing
+
+It names a private Grafana Cloud instance in a public repository, which is unnecessary attack-surface disclosure and makes the config non-portable for anyone else running the project.
+
+## Suggested fix
+
+Replace with a placeholder and document the environment variable:
+
+```json
+{ "url": "${GRAFANA_URL}" }
+```
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================
+ISSUE 14
+title:	[L-5] UI and repository polish checklist
+state:	OPEN
+author:	wenn-id (Alwan Juliawan)
+labels:	enhancement, good first issue
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	14
+--
+**Severity: Low** — grouped polish checklist, each item independent.
+
+## Context
+
+Worth stating up front: the presentation layer verified well. No console errors, no horizontal overflow at 390×844, `prefers-reduced-motion` and `:focus-visible` both handled, a working skip link, and `aria-live` on the result regions. `--muted` on `--ink` measures ~6.5:1, passing WCAG AA. The items below are refinements, not defects.
+
+## Checklist
+
+- [ ] **Repo weight.** `docs/` holds ~1.8 MB of PNGs in a repo whose entire source is ~28 KB. Compress them, or move demo media out of the repo.
+- [ ] **Label type size.** Several labels run at 8–9px (`.eyebrow`, `.stage p`, `.hero-copy dt`). Contrast passes, but the size is below comfortable reading. Consider a 10–11px floor.
+- [ ] **Dead link.** `<a class="brand" href="#">` is a link that goes nowhere. Make it a non-interactive element, or point it at `/`.
+- [ ] **Redundant tooltip.** `<code title="...">` duplicates its own text content into the `title` attribute, which some screen readers announce twice.
+- [ ] **No `package-lock.json`.** Acceptable only while the dependency count is genuinely zero; commit one as soon as a dependency is added.
+- [ ] **Optional hardening.** No CSP meta tag. Cheap to add for a static page and demonstrates security awareness.
+
+<sub>Filed from a full repository audit of `f4ae6e1`. See `AUDIT.md` for the complete report.</sub>
+==================

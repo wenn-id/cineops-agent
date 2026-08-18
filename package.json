@@ -6,7 +6,6 @@
   "scripts": {
     "lint": "node scripts/validate.mjs && node --check app.mjs && node --check src/core.mjs && node --check src/scenarios.mjs",
     "test": "node --test",
-    "build": "node scripts/build.mjs",
     "start": "python3 server.py"
   },
   "engines": {
