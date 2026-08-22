@@ -156,6 +156,14 @@ function assembleResult(scenario, query, parsed, executedToolCalls, liveRegistry
   return { ...assembled, evidence: attachDashboardUrls(assembled.evidence, liveDashboards) };
 }
 
+// Trace narration is display-only: fenced/inline code spans are stripped
+// (they usually quote tool payloads or the schema back), whitespace is
+// collapsed, and the text is capped.
+function sanitizeThought(text) {
+  const withoutCode = text.replace(/```[\s\S]*?```/g, ' ').replace(/`[^`]*`/g, ' ');
+  return withoutCode.replace(/\s+/g, ' ').trim().slice(0, 300);
+}
+
 // Multi-turn investigation loop: Gemini selects tools, we execute them against
 // the incident data, until the model returns a structured verdict. The callModel
 // injection point keeps the loop fully testable without network access.
@@ -190,9 +198,9 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
     if (functionCalls.length) {
       // The model sometimes explains what it is about to query — surface that
       // thinking as trace events; it is the agent's voice during the loop.
-      const thought = parts.map((part) => part.text ?? '').join('').trim();
+      const thought = sanitizeThought(parts.map((part) => part.text ?? '').join(''));
       if (thought) {
-        yield { event: 'thought', data: { text: thought.slice(0, 500) } };
+        yield { event: 'thought', data: { text: thought } };
       }
       contents.push({ role: 'model', parts });
       // Parallel calls in one model turn must come back as a single content
