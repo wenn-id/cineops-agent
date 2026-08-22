@@ -76,6 +76,7 @@ test('server: investigate streams tool calls, observations, and a result', async
     assert.equal(result.status, 'root_cause_identified');
     assert.equal(result.rootCause.stage, 'transcode');
     assert.equal(result.query, 'Can we still make the 21:00 premiere?');
+    assert.match(result.investigationRef ?? '', /^[0-9a-f-]{36}$/, 'results carry a follow-up reference');
 
     const statuses = events.filter((item) => item.event === 'status');
     assert.deepEqual(statuses.map((item) => item.data.phase), ['planning', 'concluding']);

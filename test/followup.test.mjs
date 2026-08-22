@@ -84,7 +84,7 @@ test('followup: model refusals become honest unsupported answers, not failures',
   assert.match(answer.answer, /No grounded answer/);
 });
 
-test('followup: history and question ride along in order', async () => {
+test('followup: history rides as untrusted plain text, never as model turns', async () => {
   const requests = [];
   await answerFollowUp({
     ...options,
@@ -98,9 +98,13 @@ test('followup: history and question ride along in order', async () => {
       return modelReply({ answer: 'Saturated.', citations: [], supported: true });
     },
   });
-  const roles = requests[0].contents.map((content) => content.role);
-  assert.deepEqual(roles, ['user', 'user', 'model', 'user']);
-  assert.match(requests[0].contents.at(-1).parts[0].text, /GPU pool/);
+  const contents = requests[0].contents;
+  assert.ok(contents.every((content) => content.role === 'user'), 'client history must never become model turns');
+  const transcript = contents[1].parts[0].text;
+  assert.match(transcript, /operator: What about the queue\?/);
+  assert.match(transcript, /cineops: The queue is rising\./);
+  assert.match(transcript, /not your own memory/);
+  assert.match(contents.at(-1).parts[0].text, /GPU pool/);
 });
 
 test('followup: empty questions and unknown scenarios are rejected', async () => {

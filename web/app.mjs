@@ -279,26 +279,23 @@ async function runFollowUp(event) {
   const question = input.value.trim();
   if (!question || !lastResult) return;
   const generation = followupGeneration;
-  const context = {
-    incidentId: lastResult.incidentId,
-    rootCause: lastResult.rootCause,
-    decision: lastResult.decision,
-    actions: lastResult.actions,
-    pipeline: lastResult.pipeline,
-    reasoning: lastResult.reasoning,
-    evidence: lastResult.evidence,
-  };
+  const investigationRef = lastResult.investigationRef;
   appendFollowUp('operator', question);
   input.value = '';
   addTrace('followup', question);
 
   const button = $('#followup-button');
   button.disabled = true;
+  if (!investigationRef) {
+    appendFollowUp('error', 'No referenced investigation — run an investigation first.');
+    button.disabled = false;
+    return;
+  }
   try {
     const response = await fetch('/api/followup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, scenarioId: 'premiere-night', context, history: followupHistory.slice(-6) }),
+      body: JSON.stringify({ question, investigationRef, history: followupHistory.slice(-12) }),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload?.error ?? `service unavailable (${response.status})`);
