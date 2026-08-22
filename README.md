@@ -83,6 +83,7 @@ only in a README.
 | Live telemetry execution | [`server/grafana-live.mjs`](server/grafana-live.mjs) | Per-stage PromQL/LogQL calls, `liveValue` provenance, per-target failure isolation |
 | Evidence grounding (anti-hallucination) | [`server/gemini-agent.mjs`](server/gemini-agent.mjs) | `assembleResult` accepts only signal ids an executed tool returned; fixture values override model numbers |
 | Living incident telemetry | [`simulator/engine.mjs`](simulator/engine.mjs) | Incident arc (baseline → failure → recovery), Prometheus exposition, Loki log push |
+| Agent evaluation harness | [`eval/run.mjs`](eval/run.mjs) | Outcome cases with latency budgets; CI gates on `npm run eval` |
 | Google Cloud deployment | [`infra/README.md`](infra/README.md) | Cloud Run service (Dockerfile), Secret Manager setup, deploy commands |
 
 Enable the live engines with `GEMINI_API_KEY` and `GRAFANA_URL` +
@@ -109,6 +110,19 @@ npm run stack:up     # Grafana at http://localhost:3000 (admin / cineops)
 ```
 
 Deploying to Cloud Run is three commands — see [`infra/README.md`](infra/README.md).
+
+## Evaluation
+
+```bash
+npm run eval
+```
+
+Six scripted and deterministic cases evaluate agent outcomes — root-cause
+accuracy, tool-grounded evidence, hallucination rejection, loop bounding,
+outage fallback — each with a latency budget. CI runs the suite on every push,
+so accuracy or latency regressions fail the build. With `GEMINI_API_KEY` set,
+a live-model case runs against the fixture tools as well. Current status:
+**6/6 pass** (see [`eval/README.md`](eval/README.md)).
 
 ## Engines, and honesty about what is live
 
