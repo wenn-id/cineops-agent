@@ -1,0 +1,13 @@
+.git
+.github
+.agents
+node_modules
+dist
+docs
+test
+eval
+*.md
+.env
+.env.*
+*.py
+*.png

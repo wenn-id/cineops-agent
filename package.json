@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "node scripts/validate.mjs && node --check web/app.mjs && node --check src/core.mjs && node --check src/scenarios.mjs",
+    "lint": "node scripts/validate.mjs && node --check web/app.mjs && node --check src/core.mjs && node --check src/scenarios.mjs && node --check server/index.mjs && node --check server/agent.mjs && node --check server/static.mjs",
     "test": "node --test",
     "build": "node scripts/build.mjs",
-    "start": "npm run build && python3 server.py",
-    "start:windows": "npm run build && python server.py"
+    "start": "npm run build && node server/index.mjs",
+    "start:replay": "npm run build && python3 server.py",
+    "start:replay:windows": "npm run build && python server.py"
   },
   "engines": {
     "node": ">=20"

@@ -1,6 +1,10 @@
 import { access, readFile } from 'node:fs/promises';
 
-const required = ['web/index.html', 'web/styles.css', 'web/app.mjs', 'src/core.mjs', 'src/scenarios.mjs'];
+const required = [
+  'web/index.html', 'web/styles.css', 'web/app.mjs',
+  'src/core.mjs', 'src/scenarios.mjs',
+  'server/index.mjs', 'server/agent.mjs', 'server/static.mjs',
+];
 const errors = [];
 
 for (const file of required) {

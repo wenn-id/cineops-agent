@@ -9,16 +9,22 @@ track of Agentic Cinema: The Blockbuster Hackathon.
 
 - Interactive incident room for upload, ingest, transcode, subtitles, quality
   control, and publishing stages.
-- Deterministic local investigator that ranks metrics and logs, identifies a
+- Zero-dependency Node agent service (`server/`): server-side investigations
+  streamed to the browser over SSE, health endpoint, static `dist/` serving,
+  and a Dockerfile for Cloud Run.
+- Deterministic investigation engine that ranks metrics and logs, identifies a
   root cause, and produces a recovery decision.
 - Read-only Grafana MCP tool trace for `query_prometheus`, `query_loki_logs`,
   and `search_dashboards`.
-- Responsive, accessible, zero-dependency UI.
+- Responsive, accessible, zero-dependency UI with automatic live/replay mode:
+  served by the agent service it streams server-side investigations; served
+  statically (e.g. GitHub Pages) it falls back to in-browser replay.
 - Node test suite covering evidence ranking, pipeline summaries, validation,
-  and operator queries.
+  operator queries, and the service API (SSE, errors, static safety).
 
-Public demo currently replays a deterministic incident fixture so it works
-without credentials or cloud billing. Gemini reasoning, Google ADK, live
+The public Pages demo runs in replay mode so it works without credentials or
+cloud billing; when served by the agent service the same UI runs the
+investigation server-side with a deterministic engine. Gemini reasoning, live
 Grafana telemetry, and Cloud Run deployment remain the next runtime milestone.
 Interface labels replayed data explicitly; it does not present fixture data as
 a live external tool call.
@@ -27,25 +33,29 @@ a live external tool call.
 
 ```bash
 npm test
-npm start            # builds dist/ then serves it (use start:windows on Windows)
+npm start            # build + agent service → http://127.0.0.1:8000 (live mode)
+npm run start:replay # offline alternative: static replay server (python)
 ```
 
-Open <http://127.0.0.1:8000>. The server only exposes the built `dist/`
-directory — never the repository, `.git/`, or `.agents/`.
+Both servers expose only the built `dist/` directory — never the repository,
+`.git/`, or `.agents/`.
 
 ## Architecture
 
 ```text
-Browser incident room
-  └─ deterministic local investigator
-       ├─ pipeline state
-       ├─ ranked evidence
-       ├─ recovery decision
-       └─ Grafana MCP tool trace (replay)
+Incident room (web/)
+  ├─ live mode: fetch SSE → agent service (server/)
+  │    └─ investigation engine (src/core.mjs) → streamed events
+  │         future: Gemini loop (#29) + Grafana Cloud MCP (#30)
+  └─ replay mode: deterministic investigator runs in the browser
+       (static hosting fallback, e.g. GitHub Pages)
 
-Planned runtime:
-Browser → Google ADK/Gemini on Cloud Run → Grafana Cloud MCP (read-only)
+Target runtime:
+Browser → agent service on Cloud Run → Gemini + Grafana Cloud MCP (read-only)
 ```
+
+Deploy instructions for Cloud Run (including secret setup) live in
+[`infra/README.md`](infra/README.md).
 
 ## Repository layout
 
