@@ -53,6 +53,23 @@ server-side and streams over SSE).
 | `GEMINI_MODEL` | Gemini model for the agent loop | `gemini-2.5-flash` |
 | `GRAFANA_URL` | Grafana Cloud MCP endpoint, e.g. `https://mcp.grafana.com/mcp` (issue #30) | unset |
 | `GRAFANA_API_KEY` | Bearer token for the MCP endpoint — store in Secret Manager | unset |
+| `RATE_LIMIT_INVESTIGATE_PER_MIN` | Investigations per client per minute (protects the Gemini quota) | `10` |
+| `RATE_LIMIT_FOLLOWUP_PER_MIN` | Follow-up questions per client per minute | `20` |
+
+## Security notes
+
+- No credential is ever read from the repo or the client; keys arrive via
+  environment (locally) or Secret Manager (Cloud Run `--set-secrets`).
+- The service is read-only by construction against external systems: the
+  Grafana MCP client enforces a hard three-tool allowlist, and the only
+  mutating endpoint (`/api/recovery`) requires an explicit approval
+  referencing a server-stored investigation, rejects cross-origin browser
+  requests, and drives a synthetic drill — not production infrastructure.
+- Expensive endpoints are rate-limited per client; 429 responses carry
+  `Retry-After`.
+- Operator authentication is intentionally out of scope for the single-user
+  demo deployment; the static site (GitHub Pages) never sees any credential.
+- Logs are structured JSON with per-request ids — no payload data is logged.
 
 With `GEMINI_API_KEY` unset the service runs the deterministic engine and
 reports `"engine":"deterministic"` at `/api/health`; with the key set it runs

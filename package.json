@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "node scripts/validate.mjs && node --check web/app.mjs && node --check src/core.mjs && node --check src/scenarios.mjs && node --check server/index.mjs && node --check server/agent.mjs && node --check server/static.mjs && node --check server/gemini.mjs && node --check server/gemini-agent.mjs && node --check server/grafana-mcp.mjs && node --check server/grafana-live.mjs && node --check server/followup.mjs && node --check simulator/index.mjs && node --check simulator/engine.mjs",
+    "lint": "node scripts/validate.mjs && node --check web/app.mjs && node --check src/core.mjs && node --check src/scenarios.mjs && node --check server/index.mjs && node --check server/agent.mjs && node --check server/static.mjs && node --check server/gemini.mjs && node --check server/gemini-agent.mjs && node --check server/grafana-mcp.mjs && node --check server/grafana-live.mjs && node --check server/followup.mjs && node --check server/ratelimit.mjs && node --check server/log.mjs && node --check simulator/index.mjs && node --check simulator/engine.mjs",
     "test": "node --test",
     "eval": "node eval/run.mjs",
     "build": "node scripts/build.mjs",

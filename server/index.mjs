@@ -9,6 +9,8 @@ import { investigateStream } from './agent.mjs';
 import { geminiAvailable } from './gemini.mjs';
 import { createMcpClient, mcpAvailable } from './grafana-mcp.mjs';
 import { answerFollowUp } from './followup.mjs';
+import { createRateLimiter } from './ratelimit.mjs';
+import { logEvent } from './log.mjs';
 import { resolveStatic } from './static.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -79,9 +81,16 @@ async function handleInvestigate(req, res) {
   }
   const query = payload.query;
 
-  // Follow-ups resolve the scenario by its library key (payload.scenarioId),
-  // so the store must keep that key — not the scenario's display id.
   const scenarioKey = payload.scenarioId;
+
+  const requestId = randomUUID();
+  const startedAt = Date.now();
+  logEvent('info', 'investigate.start', {
+    requestId,
+    scenarioId: scenarioKey,
+    engine: geminiAvailable() ? 'gemini' : 'deterministic',
+    mcp: mcpAvailable(),
+  });
 
   res.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
@@ -103,7 +112,13 @@ async function handleInvestigate(req, res) {
       }
       res.write(`event: ${message.event}\ndata: ${JSON.stringify(message.data)}\n\n`);
     }
+    logEvent('info', 'investigate.end', {
+      requestId,
+      durationMs: Math.round(Date.now() - startedAt),
+      outcome: abort.signal.aborted || res.destroyed ? 'aborted' : 'completed',
+    });
   } catch (error) {
+    logEvent('error', 'investigate.error', { requestId, message: error.message });
     if (!abort.signal.aborted && !res.destroyed) {
       res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);
     }
@@ -127,9 +142,24 @@ async function callSimulator(path, init) {
 }
 
 export function startServer({ port = Number(process.env.PORT) || 8000, host = process.env.HOST || '127.0.0.1' } = {}) {
+  // Expensive endpoints carry model calls; their rate limits protect the
+  // Gemini quota as much as the process itself.
+  const investigateLimiter = createRateLimiter({ max: Number(process.env.RATE_LIMIT_INVESTIGATE_PER_MIN ?? 10) });
+  const followupLimiter = createRateLimiter({ max: Number(process.env.RATE_LIMIT_FOLLOWUP_PER_MIN ?? 20) });
+  const clientKey = (req) => String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+  const rateLimited = (req, res, limiter, bucket) => {
+    const decision = limiter(`${bucket}:${clientKey(req)}`);
+    if (decision.allowed) return false;
+    const retryAfterSec = Math.max(1, Math.ceil(decision.retryAfterMs / 1000));
+    logEvent('warn', 'ratelimit.block', { bucket, retryAfterSec });
+    const body = JSON.stringify({ error: `rate limit exceeded — retry in ${retryAfterSec}s` });
+    res.writeHead(429, { 'content-type': 'application/json; charset=utf-8', 'retry-after': String(retryAfterSec), 'content-length': Buffer.byteLength(body) });
+    res.end(body);
+    return true;
+  };
   const server = createServer(async (req, res) => {
+    const url = new URL(req.url, 'http://localhost');
     try {
-      const url = new URL(req.url, 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/api/health') {
         sendJson(res, 200, {
           ok: true,
@@ -142,10 +172,12 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/investigate') {
+        if (rateLimited(req, res, investigateLimiter, 'investigate')) return;
         await handleInvestigate(req, res);
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/followup') {
+        if (rateLimited(req, res, followupLimiter, 'followup')) return;
         let payload;
         try {
           payload = await readJsonBody(req);
@@ -178,8 +210,10 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
             context: stored.result,
             history: payload.history,
           });
+          logEvent('info', 'followup.answer', { scenarioId: stored.scenarioId, supported: answer.supported, citations: answer.citations.length });
           sendJson(res, 200, answer);
         } catch (error) {
+          logEvent('error', 'followup.error', { message: error.message });
           sendJson(res, error.statusCode ?? 502, { error: `follow-up failed: ${error.message}` });
         }
         return;
@@ -224,8 +258,10 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
         }
         try {
           const outcome = await callSimulator('/recover', { method: 'POST' });
+          logEvent('info', 'recovery.approved', { investigationRef: payload.investigationRef, phase: outcome.phase });
           sendJson(res, 200, { acknowledged: true, ...outcome });
         } catch (error) {
+          logEvent('error', 'recovery.error', { investigationRef: payload.investigationRef, message: error.message });
           sendJson(res, 502, { error: `recovery failed: ${error.message}` });
         }
         return;
@@ -255,7 +291,8 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
       }
       res.writeHead(405, { 'content-type': 'text/plain; charset=utf-8', allow: 'GET, POST' });
       res.end('Method not allowed');
-    } catch {
+    } catch (error) {
+      logEvent('error', 'request.error', { path: url.pathname, method: req.method, message: error.message });
       if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
       res.end('Internal error');
     }

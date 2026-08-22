@@ -146,6 +146,18 @@ The UI always names the engine that produced an investigation.
   the deterministic engine completes the investigation. Replayed tool data is
   always labeled `replay` — fixture data is never presented as a live call.
 
+## Reliability & security notes
+
+- **Graceful degradation everywhere**: any Gemini or Grafana MCP failure
+  streams an honest fallback status and completes the investigation on the
+  deterministic engine; the static Pages demo always works.
+- **Rate limits** guard the expensive endpoints (10 investigations /
+  20 follow-ups per client per minute, env-tunable) so a stray burst cannot
+  burn the model quota; 429s carry `Retry-After`.
+- **Structured JSON logs** with per-request ids; no payload data is logged.
+- Full security posture (secret handling, read-only allowlists, approval
+  binding, out-of-scope items) in [`infra/README.md`](infra/README.md).
+
 ## Repository layout
 
 ```text
