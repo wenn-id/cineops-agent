@@ -28,6 +28,49 @@ The service is a zero-dependency Node 20 container (`Dockerfile` at the repo
 root). It listens on `HOST:PORT` (Cloud Run injects `PORT`, the image defaults
 `HOST=0.0.0.0`).
 
+### Continuous deployment (automated)
+
+`.github/workflows/deploy.yml` builds, tests, and deploys on every push to
+`main` — **skipped (green) until credentials are configured**:
+
+1. Enable APIs and create a deployer service account with Workload Identity
+   Federation (no long-lived keys in the repo):
+
+```bash
+gcloud config set project cineops-agentic-cinema-2026
+gcloud services enable run.googleapis.com iamcredentials.googleapis.com cloudbuild.googleapis.com
+
+gcloud iam service-accounts create cineops-deployer
+gcloud projects add-iam-policy-binding cineops-agentic-cinema-2026 \
+  --member "serviceAccount:cineops-deployer@cineops-agentic-cinema-2026.iam.gserviceaccount.com" \
+  --role roles/run.admin
+gcloud projects add-iam-policy-binding cineops-agentic-cinema-2026 \
+  --member "serviceAccount:cineops-deployer@cineops-agentic-cinema-2026.iam.gserviceaccount.com" \
+  --role roles/iam.serviceAccountUser
+
+gcloud iam workload-identity-pools create github --location=global
+gcloud iam workload-identity-pools providers create-oidc github-cineops \
+  --location=global --workload-identity-pool=github \
+  --issuer-uri=https://token.actions.githubusercontent.com \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+  --attribute-condition="assertion.repository=='wenn-id/cineops-agent'"
+gcloud iam service-accounts add-iam-policy-binding \
+  cineops-deployer@cineops-agentic-cinema-2026.iam.gserviceaccount.com \
+  --role roles/iam.workloadIdentityUser \
+  --member "principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/attribute.repository/wenn-id/cineops-agent"
+```
+
+2. In the repository settings add secrets `WIF_PROVIDER`
+   (`projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github-cineops`),
+   `WIF_SERVICE_ACCOUNT`
+   (`cineops-deployer@cineops-agentic-cinema-2026.iam.gserviceaccount.com`), and
+   `GCP_PROJECT_ID`, then set the repository **variable** `CLOUD_DEPLOY=true`.
+
+3. Push to `main`: the workflow deploys and health-checks
+   `<service-url>/api/health`; the deploy badge on the README tracks it.
+
+### First deploy by hand (optional)
+
 ```bash
 gcloud auth login
 gcloud config set project cineops-agentic-cinema-2026
@@ -40,6 +83,8 @@ gcloud run deploy cineops-agent \
 
 The deployment URL serves the incident room (live mode: the investigation runs
 server-side and streams over SSE).
+
+## Environment
 
 ## Environment
 

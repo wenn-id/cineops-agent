@@ -10,6 +10,7 @@ timeout, ingest storage surge, subtitle drift, CDN origin storm), selectable
 in the incident room.
 
 [![CI](https://github.com/wenn-id/cineops-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/wenn-id/cineops-agent/actions/workflows/ci.yml)
+[![deploy](https://github.com/wenn-id/cineops-agent/actions/workflows/deploy.yml/badge.svg)](https://github.com/wenn-id/cineops-agent/actions/workflows/deploy.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![demo](https://img.shields.io/badge/live%20demo-incident%20room-d8ff45)](https://wenn-id.github.io/cineops-agent/)
 [![engine](https://img.shields.io/badge/engine-Gemini%20%C2%B7%20Grafana%20MCP-8c958c)](server/gemini-agent.mjs)
@@ -88,7 +89,7 @@ only in a README.
 | Human-in-the-loop recovery | [`server/index.mjs`](server/index.mjs) + [`simulator/index.mjs`](simulator/index.mjs) | `POST /api/recovery` requires explicit approval and drives the live simulator's recovery arc; the UI watches stages heal via `/api/incident-state` |
 | Living incident telemetry | [`simulator/engine.mjs`](simulator/engine.mjs) | Incident arc (baseline → failure → recovery), Prometheus exposition, Loki log push |
 | Agent evaluation harness | [`eval/run.mjs`](eval/run.mjs) | Outcome cases with latency budgets; CI gates on `npm run eval` |
-| Google Cloud deployment | [`infra/README.md`](infra/README.md) | Cloud Run service (Dockerfile), Secret Manager setup, deploy commands |
+| Google Cloud deployment | [`infra/README.md`](infra/README.md) | Cloud Run service (Dockerfile), Secret Manager setup, and the automated CD pipeline (Workload Identity Federation, health-checked, green-skipped until credentials land) |
 
 Enable the live engines with `GEMINI_API_KEY` and `GRAFANA_URL` +
 `GRAFANA_API_KEY`; verify a Gemini key in one command:

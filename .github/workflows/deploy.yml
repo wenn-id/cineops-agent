@@ -1,0 +1,60 @@
+name: deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  SERVICE: cineops-agent
+  REGION: us-central1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Credential-ready but skip-safe: the job stays green (skipped) until the
+    # repository variable CLOUD_DEPLOY=true and the WIF secrets exist, so the
+    # pipeline never blocks on credentials it does not have yet.
+    if: vars.CLOUD_DEPLOY == 'true'
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation — no long-lived keys.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run eval
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --source . \
+            --project "${{ secrets.GCP_PROJECT_ID }}" \
+            --region "$REGION" \
+            --allow-unauthenticated \
+            --set-env-vars NODE_ENV=production
+
+      - name: Verify the deployment is healthy
+        run: |
+          URL="$(gcloud run services describe "$SERVICE" --project "${{ secrets.GCP_PROJECT_ID }}" --region "$REGION" --format 'value(status.url)')"
+          echo "Live URL: $URL"
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS "$URL/api/health" | grep -q '"ok":true'; then
+              echo "Deployment healthy."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::health check failed against $URL/api/health"
+          exit 1
