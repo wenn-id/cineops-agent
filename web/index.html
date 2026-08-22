@@ -87,6 +87,15 @@
           <ol id="actions" class="actions"></ol>
         </article>
 
+        <div id="recovery" class="recovery" hidden>
+          <p class="recovery-title" id="recovery-title">RECOVERY PLAN · NEEDS YOUR APPROVAL</p>
+          <p id="recovery-status" aria-live="polite">Approve the agent's plan to execute it against the live pipeline, or reject to escalate to a human operator.</p>
+          <div class="recovery-actions">
+            <button id="approve-recovery" type="button">Approve &amp; execute</button>
+            <button id="reject-recovery" type="button">Reject · escalate</button>
+          </div>
+        </div>
+
         <div id="followup" class="followup" hidden>
           <p class="followup-title">FOLLOW-UP · GROUNDED IN THIS INVESTIGATION</p>
           <ol id="followup-thread" class="followup-thread" aria-live="polite"></ol>

@@ -106,6 +106,17 @@ h2 { margin: 0; font-size: clamp(1.4rem, 2.4vw, 2.1rem); letter-spacing: -.04em;
 .agent-trace li[data-kind="tool"] em { color: var(--green); }
 .agent-trace li[data-kind="replay"] em { color: var(--amber); }
 .agent-trace li[data-kind="followup"] em { color: var(--blue); }
+.agent-trace li[data-kind="recovery"] em { color: var(--green); }
+
+.recovery { margin-top: 30px; border: 1px solid var(--line); border-left: 2px solid var(--amber); background: var(--panel); padding: 16px 18px; }
+.recovery-title { margin: 0 0 10px; color: var(--amber); font: 700 8px/1 ui-monospace, monospace; letter-spacing: .14em; }
+.recovery p[aria-live] { margin: 0 0 14px; color: #bec4bd; font-size: 12px; line-height: 1.6; }
+.recovery-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.recovery-actions button { cursor: pointer; border: 0; padding: 12px 20px; font: 700 10px/1 ui-monospace, monospace; letter-spacing: .1em; }
+#approve-recovery { background: var(--green); color: var(--ink); }
+#reject-recovery { background: transparent; color: var(--paper); border: 1px solid var(--line); }
+.recovery-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.recovery-actions button:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
 
 .followup { margin-top: 34px; border-top: 1px solid var(--line); padding-top: 18px; }
 .followup-title { margin: 0 0 14px; color: var(--muted); font: 700 8px/1 ui-monospace, monospace; letter-spacing: .14em; }

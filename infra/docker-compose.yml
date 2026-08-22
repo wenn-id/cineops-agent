@@ -13,6 +13,17 @@ services:
       TICK_MS: "3000"
       TICK_SECONDS: "45"
 
+  agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      SIMULATOR_URL: http://simulator:9100
+    ports:
+      - "8080:8080"
+    depends_on:
+      - simulator
+
   prometheus:
     image: prom/prometheus:v3.4.1
     volumes:

@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { arcFraction, formatMetrics, logBatch, metricsSnapshot, scenarios } from './engine.mjs';
+import { arcFraction, formatMetrics, logBatch, metricsSnapshot, scenarios, stageStatuses } from './engine.mjs';
 
 const SCENARIO_ID = process.env.SCENARIO ?? 'premiere-night';
 const METRICS_PORT = Number(process.env.METRICS_PORT ?? 9100);
@@ -46,20 +46,41 @@ async function pushToLoki(batch) {
   }
 }
 
-function createMetricsServer() {
+function createSimulatorServer() {
   return createServer((req, res) => {
+    const send = (statusCode, body, type = 'application/json; charset=utf-8') => {
+      res.writeHead(statusCode, { 'content-type': type });
+      res.end(typeof body === 'string' ? body : JSON.stringify(body));
+    };
     if (req.method === 'GET' && req.url === '/metrics') {
       const { fraction } = state();
-      res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8' });
-      res.end(formatMetrics(metricsSnapshot(scenario, fraction, tick)));
+      send(200, formatMetrics(metricsSnapshot(scenario, fraction, tick)), 'text/plain; version=0.0.4; charset=utf-8');
       return;
     }
-    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-    res.end('Not found');
+    if (req.method === 'GET' && req.url === '/state') {
+      const { elapsed, fraction, phase } = state();
+      send(200, {
+        scenarioId: SCENARIO_ID,
+        phase,
+        fraction: Number(fraction.toFixed(3)),
+        elapsed,
+        metrics: metricsSnapshot(scenario, fraction, tick),
+        stages: stageStatuses(scenario, fraction),
+      });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/recover') {
+      // Human-approved recovery only: jump the arc into its descending phase.
+      const windowTicks = Math.ceil(scenario.replayWindowSec / TICK_SECONDS);
+      tick = Math.max(tick, windowTicks);
+      send(200, { ok: true, phase: 'recovery' });
+      return;
+    }
+    send(404, 'Not found', 'text/plain; charset=utf-8');
   });
 }
 
-export function startSimulator({ port = METRICS_PORT, host = '0.0.0.0', server = createMetricsServer() } = {}) {
+export function startSimulator({ port = METRICS_PORT, host = '0.0.0.0', server = createSimulatorServer() } = {}) {
   return new Promise((resolvePromise, rejectPromise) => {
     const failFast = (error) => rejectPromise(error);
     server.once('error', failFast);

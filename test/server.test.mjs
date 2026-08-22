@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 
 import { startServer } from '../server/index.mjs';
+import { startSimulator } from '../simulator/index.mjs';
 import { resolveStatic } from '../server/static.mjs';
 
 function parseEvents(raw) {
@@ -121,6 +122,61 @@ test('server: investigate rejects unknown scenarios and malformed bodies', async
     assert.equal(method.status, 405);
   } finally {
     await new Promise((done) => server.close(done));
+  }
+});
+
+test('server: recovery requires approval and the simulator', async () => {
+  const { server, port } = await startServer({ port: 0 });
+  const base = `http://127.0.0.1:${port}`;
+  const hadSimulator = process.env.SIMULATOR_URL;
+  delete process.env.SIMULATOR_URL;
+  try {
+    const notApproved = await fetch(`${base}/api/recovery`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ approved: false }),
+    });
+    assert.equal(notApproved.status, 400);
+    assert.match((await notApproved.json()).error, /explicit approval/);
+
+    const noSimulator = await fetch(`${base}/api/recovery`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ approved: true }),
+    });
+    assert.equal(noSimulator.status, 503);
+
+    const noState = await fetch(`${base}/api/incident-state`);
+    assert.equal(noState.status, 503);
+  } finally {
+    if (hadSimulator !== undefined) process.env.SIMULATOR_URL = hadSimulator;
+    await new Promise((done) => server.close(done));
+  }
+});
+
+test('server: approved recovery drives the live simulator', async () => {
+  const simulator = await startSimulator({ port: 0, host: '127.0.0.1' });
+  process.env.SIMULATOR_URL = `http://127.0.0.1:${simulator.port}`;
+  const { server, port } = await startServer({ port: 0 });
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    const before = await (await fetch(`${base}/api/incident-state`)).json();
+    assert.ok(Array.isArray(before.stages));
+    assert.equal(before.scenarioId, 'premiere-night');
+
+    const approval = await fetch(`${base}/api/recovery`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ approved: true }),
+    });
+    assert.equal(approval.status, 200);
+    const payload = await approval.json();
+    assert.equal(payload.acknowledged, true);
+    assert.equal(payload.phase, 'recovery');
+  } finally {
+    delete process.env.SIMULATOR_URL;
+    await new Promise((done) => server.close(done));
+    await new Promise((done) => simulator.server.close(done));
   }
 });
 

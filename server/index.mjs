@@ -107,6 +107,20 @@ async function handleInvestigate(req, res) {
   res.end();
 }
 
+export function simulatorAvailable() {
+  return Boolean(process.env.SIMULATOR_URL);
+}
+
+async function callSimulator(path, init) {
+  const response = await fetch(`${process.env.SIMULATOR_URL}${path}`, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!response.ok) throw new Error(`simulator responded ${response.status}`);
+  return response.json();
+}
+
 export function startServer({ port = Number(process.env.PORT) || 8000, host = process.env.HOST || '127.0.0.1' } = {}) {
   const server = createServer(async (req, res) => {
     try {
@@ -160,6 +174,43 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
           sendJson(res, 200, answer);
         } catch (error) {
           sendJson(res, error.statusCode ?? 502, { error: `follow-up failed: ${error.message}` });
+        }
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/recovery') {
+        let payload;
+        try {
+          payload = await readJsonBody(req);
+        } catch {
+          sendJson(res, 400, { error: 'invalid JSON body' });
+          return;
+        }
+        if (payload?.approved !== true) {
+          sendJson(res, 400, { error: 'recovery requires explicit approval' });
+          return;
+        }
+        if (!simulatorAvailable()) {
+          sendJson(res, 503, { error: 'recovery drill requires the telemetry simulator (set SIMULATOR_URL)' });
+          return;
+        }
+        try {
+          const outcome = await callSimulator('/recover', { method: 'POST' });
+          sendJson(res, 200, { acknowledged: true, ...outcome });
+        } catch (error) {
+          sendJson(res, 502, { error: `recovery failed: ${error.message}` });
+        }
+        return;
+      }
+      if (req.method === 'GET' && url.pathname === '/api/incident-state') {
+        if (!simulatorAvailable()) {
+          sendJson(res, 503, { error: 'incident state requires the telemetry simulator (set SIMULATOR_URL)' });
+          return;
+        }
+        try {
+          const state = await callSimulator('/state');
+          sendJson(res, 200, state);
+        } catch (error) {
+          sendJson(res, 502, { error: `incident state failed: ${error.message}` });
         }
         return;
       }

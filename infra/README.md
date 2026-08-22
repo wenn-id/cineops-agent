@@ -13,6 +13,9 @@ npm run stack:up
 
 - Grafana: <http://localhost:3000> (admin / cineops) — dashboard "Neon Harbor — Premiere Delivery"
 - Prometheus: <http://localhost:9090>
+- Agent service: <http://localhost:8080> — the incident room with live recovery:
+  run an investigation, approve the recovery plan, and watch the pipeline heal
+  in the UI and in Grafana
 - The simulator replays the incident arc (baseline → failure → recovery) on a
   loop; `TICK_MS` / `TICK_SECONDS` in `infra/docker-compose.yml` control the pace.
 
@@ -45,6 +48,7 @@ server-side and streams over SSE).
 | `PORT` | Listen port (set by Cloud Run) | `8000` |
 | `HOST` | Bind address (image sets `0.0.0.0` for containers) | `127.0.0.1` |
 | `STREAM_DELAY_MS` | Artificial per-event delay for demo pacing (deterministic engine) | `0` |
+| `SIMULATOR_URL` | Telemetry simulator base URL — enables approved recovery + live incident state | unset |
 | `GEMINI_API_KEY` | Enables the Gemini investigation engine (issue #29) — store in Secret Manager | unset |
 | `GEMINI_MODEL` | Gemini model for the agent loop | `gemini-2.5-flash` |
 | `GRAFANA_URL` | Grafana Cloud MCP endpoint, e.g. `https://mcp.grafana.com/mcp` (issue #30) | unset |

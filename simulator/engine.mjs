@@ -79,4 +79,20 @@ export function arcFraction(elapsed, windowSec, recoverySec) {
   return { fraction: 0, phase: 'complete' };
 }
 
+// Pipeline stage statuses derived from the incident arc — the same function
+// drives the dashboard story and the UI recovery view, so what the operator
+// sees healing is exactly what the telemetry is doing.
+export function stageStatuses(scenario, fraction) {
+  const transcodeFailed = fraction > 0.3;
+  const transcodeDegraded = fraction > 0.15 && fraction <= 0.3;
+  const subtitleDegraded = fraction > 0.5;
+  return scenario.stages.map((stage) => {
+    let status = stage.status;
+    if (stage.id === 'transcode') status = transcodeFailed ? 'failed' : transcodeDegraded ? 'degraded' : 'healthy';
+    else if (stage.id === 'subtitles') status = subtitleDegraded ? 'degraded' : 'healthy';
+    else if (stage.id === 'quality-control') status = transcodeFailed || transcodeDegraded ? 'waiting' : 'healthy';
+    return { id: stage.id, label: stage.label, status };
+  });
+}
+
 export { scenarios };

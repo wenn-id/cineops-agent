@@ -83,6 +83,7 @@ only in a README.
 | Live telemetry execution | [`server/grafana-live.mjs`](server/grafana-live.mjs) | Per-stage PromQL/LogQL calls, `liveValue` provenance, per-target failure isolation |
 | Evidence grounding (anti-hallucination) | [`server/gemini-agent.mjs`](server/gemini-agent.mjs) | `assembleResult` accepts only signal ids an executed tool returned; fixture values override model numbers |
 | Grounded follow-up Q&A | [`server/followup.mjs`](server/followup.mjs) | Multi-turn answers from the investigation context only; citations filtered against context ids; unsupported questions answered honestly |
+| Human-in-the-loop recovery | [`server/index.mjs`](server/index.mjs) + [`simulator/index.mjs`](simulator/index.mjs) | `POST /api/recovery` requires explicit approval and drives the live simulator's recovery arc; the UI watches stages heal via `/api/incident-state` |
 | Living incident telemetry | [`simulator/engine.mjs`](simulator/engine.mjs) | Incident arc (baseline → failure → recovery), Prometheus exposition, Loki log push |
 | Agent evaluation harness | [`eval/run.mjs`](eval/run.mjs) | Outcome cases with latency budgets; CI gates on `npm run eval` |
 | Google Cloud deployment | [`infra/README.md`](infra/README.md) | Cloud Run service (Dockerfile), Secret Manager setup, deploy commands |

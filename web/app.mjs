@@ -33,12 +33,12 @@ async function detectLiveMode() {
   }
 }
 
-function renderPipeline() {
-  $('#pipeline-stages').innerHTML = scenario.stages.map((stage, index) => `
+function renderPipeline(stages = scenario.stages) {
+  $('#pipeline-stages').innerHTML = stages.map((stage, index) => `
     <li class="stage" data-status="${escapeHtml(stage.status)}">
       <span class="stage-number">${String(index + 1).padStart(2, '0')}</span>
       <h3>${escapeHtml(stage.label)}</h3>
-      <p>${escapeHtml(stage.detail)}</p>
+      <p>${escapeHtml(stage.detail ?? stage.status)}</p>
       <span class="stage-status">${escapeHtml(stage.status)}</span>
     </li>
   `).join('');
@@ -83,6 +83,7 @@ function renderResult(result, { skipEvidence = false } = {}) {
   followupHistory.length = 0;
   $('#followup-thread').innerHTML = '';
   $('#followup').hidden = !liveMode;
+  showRecoveryPanel();
   $('#result-status').textContent = result.status === 'root_cause_identified' ? 'ROOT CAUSE IDENTIFIED' : 'MONITORING';
   $('#confidence').textContent = `${Math.round(result.confidence * 100)}% confidence`;
   $('#root-cause').textContent = result.rootCause.finding;
@@ -228,6 +229,8 @@ async function runInvestigation(event) {
   $('#evidence-list').innerHTML = '';
   $('#tool-calls').innerHTML = '';
   $('#evidence-empty').hidden = false;
+  $('#recovery').hidden = true;
+  stopRecoveryPolling();
   progress.hidden = false;
   label.textContent = 'Connecting…';
   resetTrace();
@@ -255,6 +258,84 @@ async function runInvestigation(event) {
     button.disabled = false;
     button.textContent = 'Run again ↗';
   }
+}
+
+let recoveryPolling = null;
+
+function stopRecoveryPolling() {
+  if (recoveryPolling) {
+    clearInterval(recoveryPolling);
+    recoveryPolling = null;
+  }
+}
+
+function showRecoveryPanel() {
+  stopRecoveryPolling();
+  $('#recovery').hidden = !liveMode;
+  if (!liveMode) return;
+  $('#recovery-title').textContent = 'RECOVERY PLAN · NEEDS YOUR APPROVAL';
+  $('#recovery-status').textContent = 'Approve the agent\u2019s plan to execute it against the live pipeline, or reject to escalate to a human operator.';
+  $('#approve-recovery').disabled = false;
+  $('#reject-recovery').disabled = false;
+  $('#approve-recovery').focus();
+}
+
+async function requestRecovery(approved) {
+  const approveButton = $('#approve-recovery');
+  const rejectButton = $('#reject-recovery');
+  approveButton.disabled = true;
+  rejectButton.disabled = true;
+  if (!approved) {
+    $('#recovery-title').textContent = 'RECOVERY REJECTED';
+    $('#recovery-status').textContent = 'Escalated to the human on-call operator. No changes were made to the pipeline.';
+    addTrace('recovery', 'Recovery rejected — escalated to the human operator');
+    return;
+  }
+  addTrace('recovery', 'Recovery approved — executing against the live pipeline');
+  try {
+    const response = await fetch('/api/recovery', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ approved: true }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.error ?? `service unavailable (${response.status})`);
+    $('#recovery-title').textContent = 'RECOVERY IN PROGRESS';
+    $('#recovery-status').textContent = 'Watching the pipeline heal…';
+    pollIncidentState();
+  } catch (error) {
+    $('#recovery-title').textContent = 'RECOVERY UNAVAILABLE';
+    $('#recovery-status').textContent = error.message;
+    approveButton.disabled = false;
+    rejectButton.disabled = false;
+  }
+}
+
+function pollIncidentState() {
+  const startedAt = Date.now();
+  recoveryPolling = setInterval(async () => {
+    try {
+      const response = await fetch('/api/incident-state');
+      if (!response.ok) throw new Error('state unavailable');
+      const state = await response.json();
+      renderPipeline(state.stages);
+      const healing = state.stages.filter((stage) => stage.status !== 'healthy').length;
+      const recovered = state.phase === 'complete' || (state.phase === 'recovery' && state.fraction <= 0.05 && healing === 0);
+      if (recovered) {
+        stopRecoveryPolling();
+        $('#recovery-title').textContent = 'PIPELINE RECOVERED';
+        $('#recovery-status').textContent = 'All stages healthy again — the premiere delivery can resume.';
+        addTrace('recovery', 'Pipeline recovered — all stages healthy');
+      } else {
+        $('#recovery-status').textContent = `Recovery underway — ${healing} stage${healing === 1 ? '' : 's'} still healing…`;
+      }
+    } catch {
+      stopRecoveryPolling();
+      $('#recovery-title').textContent = 'RECOVERY INTERRUPTED';
+      $('#recovery-status').textContent = 'Lost contact with the telemetry simulator.';
+    }
+    if (Date.now() - startedAt > 180_000) stopRecoveryPolling();
+  }, 2000);
 }
 
 const evidenceById = () => new Map((lastResult?.evidence ?? []).map((item) => [item.id, item]));
@@ -331,6 +412,8 @@ setModeIndicator();
 startCountdown();
 $('#investigation-form').addEventListener('submit', runInvestigation);
 $('#followup-form').addEventListener('submit', runFollowUp);
+$('#approve-recovery').addEventListener('click', () => requestRecovery(true));
+$('#reject-recovery').addEventListener('click', () => requestRecovery(false));
 if (new URLSearchParams(window.location.search).has('autorun')) {
   $('#investigation-form').requestSubmit();
 }

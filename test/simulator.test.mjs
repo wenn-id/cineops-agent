@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { scenarios } from '../src/scenarios.mjs';
-import { arcFraction, formatMetrics, logBatch, metricNameFromQuery, metricsSnapshot, valueAt } from '../simulator/engine.mjs';
+import { arcFraction, formatMetrics, logBatch, metricNameFromQuery, metricsSnapshot, stageStatuses, valueAt } from '../simulator/engine.mjs';
 import { startSimulator } from '../simulator/index.mjs';
 
 const scenario = scenarios['premiere-night'];
@@ -76,6 +76,26 @@ test('simulator: startup rejects cleanly when the port is taken', async () => {
   } finally {
     await new Promise((done) => first.server.close(done));
   }
+});
+
+test('engine: stage statuses follow the arc and heal on recovery', () => {
+  const byId = (fraction) => new Map(stageStatuses(scenario, fraction).map((stage) => [stage.id, stage.status]));
+
+  const healthy = byId(0.05);
+  assert.equal(healthy.get('transcode'), 'healthy');
+  assert.equal(healthy.get('quality-control'), 'healthy');
+
+  const peak = byId(1);
+  assert.equal(peak.get('transcode'), 'failed');
+  assert.equal(peak.get('subtitles'), 'degraded');
+  assert.equal(peak.get('quality-control'), 'waiting');
+
+  const recovering = byId(0.4);
+  assert.equal(recovering.get('transcode'), 'failed', 'still failing mid-descent');
+
+  const healed = byId(0.1);
+  assert.equal(healed.get('transcode'), 'healthy');
+  assert.equal(healed.get('quality-control'), 'healthy');
 });
 
 test('simulator: /metrics serves the exposition over HTTP', async () => {
