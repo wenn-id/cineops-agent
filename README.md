@@ -88,6 +88,7 @@ only in a README.
 | Evidence grounding (anti-hallucination) | [`server/gemini-agent.mjs`](server/gemini-agent.mjs) | `assembleResult` accepts only signal ids an executed tool returned; fixture values override model numbers |
 | Grounded follow-up Q&A | [`server/followup.mjs`](server/followup.mjs) | Multi-turn answers from the investigation context only; citations filtered against context ids; unsupported questions answered honestly |
 | Human-in-the-loop recovery | [`server/index.mjs`](server/index.mjs) + [`simulator/index.mjs`](simulator/index.mjs) | `POST /api/recovery` requires explicit approval and drives the live simulator's recovery arc; the UI watches stages heal via `/api/incident-state` |
+| Self-monitoring (dogfooding) | [`server/metrics.mjs`](server/metrics.mjs) | `GET /metrics` counters (investigations by engine, completions, follow-ups, rate-limit blocks, recoveries) scraped by the same Prometheus and shown in the provisioned "Agent Self-Health" dashboard |
 | Living incident telemetry | [`simulator/engine.mjs`](simulator/engine.mjs) | Incident arc (baseline → failure → recovery), Prometheus exposition, Loki log push |
 | Agent evaluation harness | [`eval/run.mjs`](eval/run.mjs) | Outcome cases with latency budgets; CI gates on `npm run eval` |
 | Google Cloud deployment | [`infra/README.md`](infra/README.md) | Cloud Run service (Dockerfile), Secret Manager setup, and the automated CD pipeline (Workload Identity Federation, health-checked, green-skipped until credentials land) |

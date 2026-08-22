@@ -1,0 +1,67 @@
+{
+  "title": "CineOps — Agent Self-Health",
+  "uid": "cineops-self",
+  "tags": ["cineops", "self"],
+  "timezone": "utc",
+  "schemaVersion": 41,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Investigations by engine",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": null },
+      "targets": [
+        { "expr": "sum by (engine) (increase(cineops_investigations_total[5m]))", "legendFormat": "{{engine}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "title": "Completed vs aborted vs failed",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": null },
+      "targets": [
+        { "expr": "sum(increase(cineops_investigations_completed_total{outcome=\"completed\"}[5m]))", "legendFormat": "completed", "refId": "A" },
+        { "expr": "sum(increase(cineops_investigations_completed_total{outcome=\"aborted\"}[5m]))", "legendFormat": "aborted", "refId": "B" },
+        { "expr": "sum(increase(cineops_investigations_failed_total[5m]))", "legendFormat": "failed", "refId": "C" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "Follow-up answers (supported vs not)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": null },
+      "targets": [
+        { "expr": "sum by (supported) (increase(cineops_followups_total[5m]))", "legendFormat": "supported={{supported}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Rate-limit blocks & recoveries",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": null },
+      "targets": [
+        { "expr": "sum by (bucket) (increase(cineops_ratelimit_blocks_total[5m]))", "legendFormat": "blocked: {{bucket}}", "refId": "A" },
+        { "expr": "sum by (phase) (increase(cineops_recoveries_total[5m]))", "legendFormat": "recovery: {{phase}}", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "title": "Service uptime",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": null },
+      "targets": [{ "expr": "max(cineops_service_uptime_seconds)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    }
+  ]
+}

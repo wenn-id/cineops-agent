@@ -7,7 +7,7 @@ const required = [
   'server/gemini.mjs', 'server/gemini-agent.mjs',
   'server/grafana-mcp.mjs', 'server/grafana-live.mjs',
   'server/followup.mjs',
-  'server/ratelimit.mjs', 'server/log.mjs',
+  'server/ratelimit.mjs', 'server/log.mjs', 'server/metrics.mjs',
   'simulator/index.mjs', 'simulator/engine.mjs',
   'eval/run.mjs', 'eval/cases.mjs',
 ];
