@@ -2,7 +2,7 @@ import { access, readFile } from 'node:fs/promises';
 
 const required = [
   'web/index.html', 'web/styles.css', 'web/app.mjs',
-  'src/core.mjs', 'src/scenarios.mjs',
+  'src/core.mjs', 'src/scenarios.mjs', 'src/report.mjs',
   'server/index.mjs', 'server/agent.mjs', 'server/static.mjs',
   'server/gemini.mjs', 'server/gemini-agent.mjs',
   'server/grafana-mcp.mjs', 'server/grafana-live.mjs',
@@ -19,7 +19,7 @@ for (const file of required) {
 
 const html = await readFile('web/index.html', 'utf8');
 const css = await readFile('web/styles.css', 'utf8');
-const anchors = ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list', 'result-status', 'trace-list', 'result-reasoning', 'followup-form', 'followup-thread', 'recovery', 'approve-recovery', 'reject-recovery', 'scenario-select', 'incident-eyebrow', 'hero-hook', 'hero-deadline'];
+const anchors = ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list', 'result-status', 'trace-list', 'result-reasoning', 'followup-form', 'followup-thread', 'recovery', 'approve-recovery', 'reject-recovery', 'scenario-select', 'incident-eyebrow', 'hero-hook', 'hero-deadline', 'export-report'];
 for (const id of anchors) {
   if (!html.includes(`id="${id}"`)) errors.push(`missing #${id}`);
 }

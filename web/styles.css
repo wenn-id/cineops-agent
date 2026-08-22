@@ -139,6 +139,10 @@ h2 { margin: 0; font-size: clamp(1.4rem, 2.4vw, 2.1rem); letter-spacing: -.04em;
 .followup-form button:disabled { opacity: .5; cursor: wait; }
 
 .result-reasoning { margin: 26px 0 0; border: 1px solid var(--line); border-left: 2px solid var(--acid); background: var(--panel); padding: 14px 16px; }
+.result-actions-row { margin-top: 22px; }
+.export-button { background: transparent; color: var(--paper); border: 1px solid var(--line); padding: 10px 16px; font: 700 9px/1 ui-monospace, monospace; letter-spacing: .12em; cursor: pointer; }
+.export-button:hover { border-color: var(--acid); color: var(--acid); }
+.export-button:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
 .result-reasoning span { display: block; color: var(--muted); font: 700 8px/1 ui-monospace, monospace; letter-spacing: .14em; margin-bottom: 8px; }
 .result-reasoning p { margin: 0; color: #bec4bd; font-size: 12px; line-height: 1.65; }
 

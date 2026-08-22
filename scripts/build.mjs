@@ -15,8 +15,8 @@ for (const file of ['core.mjs', 'scenarios.mjs']) {
 const appPath = 'dist/app.mjs';
 const appSource = await readFile(appPath, 'utf8');
 const occurrences = appSource.split("'../src/").length - 1;
-if (occurrences !== 2) {
-  throw new Error(`expected 2 '../src/' imports in web/app.mjs, found ${occurrences}`);
+if (occurrences !== 3) {
+  throw new Error(`expected 3 '../src/' imports in web/app.mjs, found ${occurrences}`);
 }
 await writeFile(appPath, appSource.replaceAll("'../src/", "'./src/"));
 console.log('Built dist/');

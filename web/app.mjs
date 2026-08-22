@@ -1,5 +1,6 @@
 import { investigateIncident } from '../src/core.mjs';
 import { scenarios } from '../src/scenarios.mjs';
+import { buildReportMarkdown } from '../src/report.mjs';
 
 const params = new URLSearchParams(window.location.search);
 const requestedScenario = params.get('scenario');
@@ -106,9 +107,11 @@ function renderResult(result, { skipEvidence = false } = {}) {
 const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
 let traceStart = 0;
+const traceLog = [];
 
 function addTrace(kind, text) {
   const elapsed = traceStart ? `+${((performance.now() - traceStart) / 1000).toFixed(1)}s` : '';
+  traceLog.push({ time: elapsed, kind, text });
   const item = document.createElement('li');
   item.dataset.kind = kind;
   item.innerHTML = `<time>${escapeHtml(elapsed)}</time><em>${escapeHtml(kind)}</em><span>${escapeHtml(text)}</span>`;
@@ -119,7 +122,23 @@ function addTrace(kind, text) {
 function resetTrace() {
   $('#trace-list').innerHTML = '';
   $('#agent-trace').hidden = false;
+  traceLog.length = 0;
   traceStart = performance.now();
+}
+
+function exportReport() {
+  if (!lastResult) return;
+  const markdown = buildReportMarkdown(lastResult, {
+    trace: traceLog.slice(),
+    mode: liveMode ? 'live' : 'replay',
+  });
+  const blob = new Blob([markdown], { type: 'text/markdown' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `cineops-${lastResult.incidentId ?? 'report'}.md`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  addTrace('recovery', `Report exported as ${link.download}`);
 }
 
 async function runReplay(query, label) {
@@ -437,6 +456,7 @@ $('#investigation-form').addEventListener('submit', runInvestigation);
 $('#followup-form').addEventListener('submit', runFollowUp);
 $('#approve-recovery').addEventListener('click', () => requestRecovery(true));
 $('#reject-recovery').addEventListener('click', () => requestRecovery(false));
+$('#export-report').addEventListener('click', exportReport);
 if (new URLSearchParams(window.location.search).has('autorun')) {
   $('#investigation-form').requestSubmit();
 }
