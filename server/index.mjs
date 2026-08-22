@@ -9,7 +9,7 @@ import { investigateStream } from './agent.mjs';
 import { geminiAvailable } from './gemini.mjs';
 import { createMcpClient, mcpAvailable } from './grafana-mcp.mjs';
 import { answerFollowUp } from './followup.mjs';
-import { createRateLimiter } from './ratelimit.mjs';
+import { createRateLimiter, parseLimit } from './ratelimit.mjs';
 import { logEvent } from './log.mjs';
 import { resolveStatic } from './static.mjs';
 
@@ -62,7 +62,7 @@ async function sendStatic(res, resolved) {
   res.end(body);
 }
 
-async function handleInvestigate(req, res) {
+async function handleInvestigate(req, res, { consumeAllowance } = {}) {
   let payload;
   try {
     payload = await readJsonBody(req);
@@ -79,6 +79,9 @@ async function handleInvestigate(req, res) {
     sendJson(res, 400, { error: 'query is required' });
     return;
   }
+  // Only a valid request consumes the investigation allowance: rejected
+  // traffic must not be able to starve real investigations.
+  if (consumeAllowance && consumeAllowance()) return;
   const query = payload.query;
 
   const scenarioKey = payload.scenarioId;
@@ -143,10 +146,21 @@ async function callSimulator(path, init) {
 
 export function startServer({ port = Number(process.env.PORT) || 8000, host = process.env.HOST || '127.0.0.1' } = {}) {
   // Expensive endpoints carry model calls; their rate limits protect the
-  // Gemini quota as much as the process itself.
-  const investigateLimiter = createRateLimiter({ max: Number(process.env.RATE_LIMIT_INVESTIGATE_PER_MIN ?? 10) });
-  const followupLimiter = createRateLimiter({ max: Number(process.env.RATE_LIMIT_FOLLOWUP_PER_MIN ?? 20) });
-  const clientKey = (req) => String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+  // Gemini quota as much as the process itself. Limits fall back to safe
+  // defaults when the env is empty or malformed.
+  const investigateLimiter = createRateLimiter({ max: parseLimit(process.env.RATE_LIMIT_INVESTIGATE_PER_MIN, 10) });
+  const followupLimiter = createRateLimiter({ max: parseLimit(process.env.RATE_LIMIT_FOLLOWUP_PER_MIN, 20) });
+  // Identity comes from the socket unless an explicitly configured trusted
+  // proxy normalizes forwarding headers — otherwise callers could rotate
+  // X-Forwarded-For to sidestep the per-client limits.
+  const trustProxy = process.env.TRUST_PROXY === 'true';
+  const clientKey = (req) => {
+    if (trustProxy) {
+      const hops = String(req.headers['x-forwarded-for'] ?? '').split(',').map((hop) => hop.trim()).filter(Boolean);
+      if (hops.length) return hops.at(-1);
+    }
+    return req.socket.remoteAddress || 'unknown';
+  };
   const rateLimited = (req, res, limiter, bucket) => {
     const decision = limiter(`${bucket}:${clientKey(req)}`);
     if (decision.allowed) return false;
@@ -172,12 +186,13 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/investigate') {
-        if (rateLimited(req, res, investigateLimiter, 'investigate')) return;
-        await handleInvestigate(req, res);
+        // Malformed requests are rejected without touching the allowance;
+        // valid ones consume it just before the investigation starts.
+        const consumeAllowance = () => rateLimited(req, res, investigateLimiter, 'investigate');
+        await handleInvestigate(req, res, { consumeAllowance });
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/followup') {
-        if (rateLimited(req, res, followupLimiter, 'followup')) return;
         let payload;
         try {
           payload = await readJsonBody(req);
@@ -203,6 +218,7 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
           sendJson(res, 404, { error: 'unknown investigation' });
           return;
         }
+        if (rateLimited(req, res, followupLimiter, 'followup')) return;
         try {
           const answer = await answerFollowUp({
             question: payload.question,
