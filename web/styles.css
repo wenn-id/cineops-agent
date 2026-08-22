@@ -36,6 +36,8 @@ button { cursor: pointer; }
 .production-id { text-align: center; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .production-id span { display: block; color: var(--muted); text-transform: uppercase; font-size: 9px; letter-spacing: .18em; }
 .production-id strong { font-size: 11px; font-weight: 500; }
+.production-id select { margin-top: 4px; background: var(--panel); border: 1px solid var(--line); color: var(--paper); font: 500 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 5px 8px; max-width: 220px; }
+.production-id select:focus-visible { outline: 1px solid var(--acid); }
 .system-state { justify-self: end; color: var(--red); font: 700 10px/1 ui-monospace, monospace; letter-spacing: .12em; }
 .system-state i, .live-dot::before { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; background: currentColor; box-shadow: 0 0 12px currentColor; animation: pulse 1.5s infinite; }
 

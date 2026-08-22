@@ -81,16 +81,21 @@ export function arcFraction(elapsed, windowSec, recoverySec) {
 
 // Pipeline stage statuses derived from the incident arc — the same function
 // drives the dashboard story and the UI recovery view, so what the operator
-// sees healing is exactly what the telemetry is doing.
+// sees healing is exactly what the telemetry is doing. Each stage's fixture
+// status is its peak: stages reach it as the arc ramps and heal on descent.
 export function stageStatuses(scenario, fraction) {
-  const transcodeFailed = fraction > 0.3;
-  const transcodeDegraded = fraction > 0.15 && fraction <= 0.3;
-  const subtitleDegraded = fraction > 0.5;
+  const anyFailedPeaking = scenario.stages.some((stage) => stage.status === 'failed' && fraction > 0.3);
   return scenario.stages.map((stage) => {
-    let status = stage.status;
-    if (stage.id === 'transcode') status = transcodeFailed ? 'failed' : transcodeDegraded ? 'degraded' : 'healthy';
-    else if (stage.id === 'subtitles') status = subtitleDegraded ? 'degraded' : 'healthy';
-    else if (stage.id === 'quality-control') status = transcodeFailed || transcodeDegraded ? 'waiting' : 'healthy';
+    let status = 'healthy';
+    if (stage.status === 'healthy') {
+      status = 'healthy';
+    } else if (stage.status === 'waiting') {
+      status = anyFailedPeaking ? 'waiting' : 'healthy';
+    } else if (fraction > 0.3) {
+      status = stage.status;
+    } else if (fraction > 0.15) {
+      status = 'degraded';
+    }
     return { id: stage.id, label: stage.label, status, detail: stage.detail };
   });
 }

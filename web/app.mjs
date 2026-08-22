@@ -1,7 +1,10 @@
 import { investigateIncident } from '../src/core.mjs';
 import { scenarios } from '../src/scenarios.mjs';
 
-const scenario = scenarios['premiere-night'];
+const params = new URLSearchParams(window.location.search);
+const requestedScenario = params.get('scenario');
+const scenarioId = requestedScenario && scenarios[requestedScenario] ? requestedScenario : 'premiere-night';
+const scenario = scenarios[scenarioId];
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 
@@ -178,7 +181,7 @@ async function streamInvestigation(query) {
   const response = await fetch('/api/investigate', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ scenarioId: 'premiere-night', query }),
+      body: JSON.stringify({ scenarioId, query }),
   });
   if (!response.ok || !response.body) throw new Error(`service unavailable (${response.status})`);
 
@@ -414,6 +417,16 @@ const liveModeReady = detectLiveMode();
 renderPipeline();
 setModeIndicator();
 startCountdown();
+$('#incident-eyebrow').textContent = `INCIDENT REPLAY · ${scenario.id}`;
+const scenarioSelect = $('#scenario-select');
+scenarioSelect.innerHTML = Object.entries(scenarios)
+  .map(([id, entry]) => `<option value="${escapeHtml(id)}"${id === scenarioId ? ' selected' : ''}>${escapeHtml(entry.production)}</option>`)
+  .join('');
+scenarioSelect.addEventListener('change', () => {
+  const next = new URLSearchParams(window.location.search);
+  next.set('scenario', scenarioSelect.value);
+  window.location.search = next.toString();
+});
 $('#investigation-form').addEventListener('submit', runInvestigation);
 $('#followup-form').addEventListener('submit', runFollowUp);
 $('#approve-recovery').addEventListener('click', () => requestRecovery(true));

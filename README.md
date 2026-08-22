@@ -5,7 +5,9 @@
 CineOps Agent investigates media-pipeline incidents in a single pass: it asks the
 observability stack what is wrong, correlates the evidence, and returns a root
 cause with a recovery decision — while the premiere deadline is still on the
-clock.
+clock. Four incident scenarios ship in the library (premiere transcode
+timeout, ingest storage surge, subtitle drift, CDN origin storm), selectable
+in the incident room.
 
 [![CI](https://github.com/wenn-id/cineops-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/wenn-id/cineops-agent/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -119,12 +121,13 @@ Deploying to Cloud Run is three commands — see [`infra/README.md`](infra/READM
 npm run eval
 ```
 
-Six scripted and deterministic cases evaluate agent outcomes — root-cause
-accuracy, tool-grounded evidence, hallucination rejection, loop bounding,
-outage fallback — each with a latency budget. CI runs the suite on every push,
-so accuracy or latency regressions fail the build. With `GEMINI_API_KEY` set,
-a live-model case runs against the fixture tools as well. Current status:
-**6/6 pass** (see [`eval/README.md`](eval/README.md)).
+Nine scripted and deterministic cases evaluate agent outcomes — root-cause
+accuracy across the full scenario library, tool-grounded evidence,
+hallucination rejection, loop bounding, and outage fallback — each with a
+latency budget. CI runs the suite on every push, so accuracy or latency
+regressions fail the build. With `GEMINI_API_KEY` set, a live-model case runs
+against the fixture tools as well. Current status: **9/9 pass** (see
+[`eval/README.md`](eval/README.md)).
 
 ## Engines, and honesty about what is live
 

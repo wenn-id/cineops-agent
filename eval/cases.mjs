@@ -33,6 +33,29 @@ const weakSignals = {
   signals: premiere.signals.map((signal) => ({ ...signal, score: 20 })),
 };
 
+// Deterministic coverage for every scenario in the library: each must reach
+// its designed root cause end-to-end.
+const ROOT_CAUSES = {
+  'premiere-night': 'transcode',
+  'storage-surge': 'ingest',
+  'subtitle-drift': 'subtitles',
+  'cdn-origin-storm': 'publish',
+};
+
+const scenarioCases = Object.entries(scenarios)
+  .filter(([id]) => id !== 'premiere-night')
+  .map(([id, scenario]) => ({
+    id: `det-${id}`,
+    kind: 'deterministic',
+    scenario,
+    description: `deterministic engine identifies the ${ROOT_CAUSES[id]} root cause`,
+    latencyBudgetMs: 250,
+    expect: {
+      status: 'root_cause_identified',
+      rootCauseStage: ROOT_CAUSES[id],
+    },
+  }));
+
 export const CASES = [
   {
     id: 'det-premiere',
@@ -116,4 +139,5 @@ export const CASES = [
       resetEmitted: true,
     },
   },
+  ...scenarioCases,
 ];
