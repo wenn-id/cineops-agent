@@ -46,18 +46,20 @@ async function pushToLoki(batch) {
   }
 }
 
-const server = createServer((req, res) => {
-  if (req.method === 'GET' && req.url === '/metrics') {
-    const { fraction } = state();
-    res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8' });
-    res.end(formatMetrics(metricsSnapshot(scenario, fraction, tick)));
-    return;
-  }
-  res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-  res.end('Not found');
-});
+function createMetricsServer() {
+  return createServer((req, res) => {
+    if (req.method === 'GET' && req.url === '/metrics') {
+      const { fraction } = state();
+      res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8' });
+      res.end(formatMetrics(metricsSnapshot(scenario, fraction, tick)));
+      return;
+    }
+    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+    res.end('Not found');
+  });
+}
 
-export function startSimulator({ port = METRICS_PORT, host = '0.0.0.0' } = {}) {
+export function startSimulator({ port = METRICS_PORT, host = '0.0.0.0', server = createMetricsServer() } = {}) {
   return new Promise((resolvePromise, rejectPromise) => {
     const failFast = (error) => rejectPromise(error);
     server.once('error', failFast);
