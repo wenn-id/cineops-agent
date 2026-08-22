@@ -122,12 +122,13 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
         try {
           const answer = await answerFollowUp({
             question: payload.question,
+            scenarioId: payload?.scenarioId,
             context: payload.context ?? {},
             history: payload.history,
           });
           sendJson(res, 200, answer);
         } catch (error) {
-          sendJson(res, 502, { error: `follow-up failed: ${error.message}` });
+          sendJson(res, error.statusCode ?? 502, { error: `follow-up failed: ${error.message}` });
         }
         return;
       }

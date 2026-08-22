@@ -8,6 +8,7 @@ const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => (
 let liveMode = false;
 let liveEngine = 'deterministic';
 let lastResult = null;
+let followupGeneration = 0;
 const followupHistory = [];
 
 function setModeIndicator(text) {
@@ -78,6 +79,7 @@ function renderEvidence(result) {
 
 function renderResult(result, { skipEvidence = false } = {}) {
   lastResult = result;
+  followupGeneration += 1;
   followupHistory.length = 0;
   $('#followup-thread').innerHTML = '';
   $('#followup').hidden = !liveMode;
@@ -276,6 +278,16 @@ async function runFollowUp(event) {
   const input = $('#followup-input');
   const question = input.value.trim();
   if (!question || !lastResult) return;
+  const generation = followupGeneration;
+  const context = {
+    incidentId: lastResult.incidentId,
+    rootCause: lastResult.rootCause,
+    decision: lastResult.decision,
+    actions: lastResult.actions,
+    pipeline: lastResult.pipeline,
+    reasoning: lastResult.reasoning,
+    evidence: lastResult.evidence,
+  };
   appendFollowUp('operator', question);
   input.value = '';
   addTrace('followup', question);
@@ -286,26 +298,16 @@ async function runFollowUp(event) {
     const response = await fetch('/api/followup', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        question,
-        context: {
-          incidentId: lastResult.incidentId,
-          rootCause: lastResult.rootCause,
-          decision: lastResult.decision,
-          actions: lastResult.actions,
-          pipeline: lastResult.pipeline,
-          reasoning: lastResult.reasoning,
-          evidence: lastResult.evidence,
-        },
-        history: followupHistory.slice(-6),
-      }),
+      body: JSON.stringify({ question, scenarioId: 'premiere-night', context, history: followupHistory.slice(-6) }),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload?.error ?? `service unavailable (${response.status})`);
+    // A new investigation may have started while the answer was in flight.
+    if (generation !== followupGeneration) return;
     appendFollowUp('cineops', payload.answer, payload.citations, payload.supported);
     followupHistory.push({ role: 'operator', text: question }, { role: 'cineops', text: payload.answer });
   } catch (error) {
-    appendFollowUp('error', error.message);
+    if (generation === followupGeneration) appendFollowUp('error', error.message);
   } finally {
     button.disabled = false;
     input.focus();

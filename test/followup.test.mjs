@@ -17,11 +17,13 @@ function modelReply(payload) {
   return { candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }] };
 }
 
+const options = { scenarioId: 'premiere-night', context: result };
+
 test('followup: grounded answers keep only context-valid citations', async () => {
   const requests = [];
   const answer = await answerFollowUp({
+    ...options,
     question: 'What is blocking the premiere?',
-    context: result,
     callModel: async (request) => {
       requests.push(request);
       return modelReply({ answer: 'The transcode queue is 7.8× baseline with saturated GPUs.', citations: ['queue-depth', 'gpu-utilization'], supported: true });
@@ -37,17 +39,33 @@ test('followup: grounded answers keep only context-valid citations', async () =>
 
 test('followup: hallucinated citations are dropped', async () => {
   const answer = await answerFollowUp({
+    ...options,
     question: 'Why did subtitles fail?',
-    context: result,
     callModel: async () => modelReply({ answer: 'Subtitle lag is secondary.', citations: ['subtitle-lag', 'made-up'], supported: true }),
   });
   assert.deepEqual(answer.citations, []);
 });
 
+test('followup: fabricated evidence ids never enter the conversation', async () => {
+  const requests = [];
+  const answer = await answerFollowUp({
+    ...options,
+    context: { ...result, evidence: [...result.evidence, { id: 'invented-metric', label: 'Made up', value: 1, unit: 'x', finding: 'fake', query: 'fake' }] },
+    question: 'Anything else failing?',
+    callModel: async (request) => {
+      requests.push(request);
+      return modelReply({ answer: 'Nothing else.', citations: [], supported: true });
+    },
+  });
+  const contextText = requests[0].contents[0].parts[0].text;
+  assert.ok(!contextText.includes('invented-metric'), 'fabricated ids must be filtered before the model sees them');
+  assert.equal(answer.engine, 'gemini');
+});
+
 test('followup: unsupported questions come back honestly', async () => {
   const answer = await answerFollowUp({
+    ...options,
     question: 'Who directed this episode?',
-    context: result,
     callModel: async () => modelReply({ answer: 'The investigation context does not say who directed the episode.', citations: [], supported: false }),
   });
   assert.equal(answer.supported, false);
@@ -55,11 +73,22 @@ test('followup: unsupported questions come back honestly', async () => {
   assert.match(answer.answer, /does not say/i);
 });
 
+test('followup: model refusals become honest unsupported answers, not failures', async () => {
+  const answer = await answerFollowUp({
+    ...options,
+    question: 'Something sensitive.',
+    callModel: async () => ({ candidates: [{ content: { parts: [] } }] }),
+  });
+  assert.equal(answer.supported, false);
+  assert.deepEqual(answer.citations, []);
+  assert.match(answer.answer, /No grounded answer/);
+});
+
 test('followup: history and question ride along in order', async () => {
   const requests = [];
   await answerFollowUp({
+    ...options,
     question: 'And the GPU pool?',
-    context: result,
     history: [
       { role: 'operator', text: 'What about the queue?' },
       { role: 'cineops', text: 'The queue is rising.' },
@@ -74,9 +103,13 @@ test('followup: history and question ride along in order', async () => {
   assert.match(requests[0].contents.at(-1).parts[0].text, /GPU pool/);
 });
 
-test('followup: empty questions are rejected', async () => {
+test('followup: empty questions and unknown scenarios are rejected', async () => {
   await assert.rejects(
-    () => answerFollowUp({ question: '   ', context: result, callModel: async () => modelReply({}) }),
+    () => answerFollowUp({ ...options, question: '   ', callModel: async () => modelReply({}) }),
     /question is required/,
+  );
+  await assert.rejects(
+    () => answerFollowUp({ ...options, question: 'q', scenarioId: 'nope' }),
+    /unknown scenario/,
   );
 });

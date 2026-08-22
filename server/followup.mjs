@@ -4,6 +4,7 @@
 // evidence; citations are filtered against the context ids so the model can
 // never invent support, and unsupported questions get an honest "no".
 
+import { scenarios } from '../src/scenarios.mjs';
 import { callGemini } from './gemini.mjs';
 import { extractJson } from './gemini-agent.mjs';
 
@@ -41,17 +42,28 @@ function contextDigest(context) {
   };
 }
 
-export async function answerFollowUp({ question, context = {}, history = [], callModel = callGemini, model }) {
+export async function answerFollowUp({ question, scenarioId, context = {}, history = [], callModel = callGemini, model }) {
   if (typeof question !== 'string' || !question.trim()) {
     const error = new Error('question is required');
     error.statusCode = 400;
     throw error;
   }
-  const validIds = new Set(contextDigest(context).evidence.map((item) => item.id).filter(Boolean));
+  // Bind the context to a real scenario: fabricated evidence ids cannot enter
+  // the conversation because only ids the scenario defines are admitted.
+  const scenario = scenarios[scenarioId];
+  if (!scenario) {
+    const error = new Error(`unknown scenario: ${String(scenarioId)}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  const scenarioIds = new Set(scenario.signals.map((signal) => signal.id));
+  const digest = contextDigest(context);
+  digest.evidence = digest.evidence.filter((item) => scenarioIds.has(item.id));
+  const validIds = new Set(digest.evidence.map((item) => item.id));
 
   const contents = [{
     role: 'user',
-    parts: [{ text: `Investigation context (the only source of truth for your answers):\n${JSON.stringify(contextDigest(context))}\n\nAnswer the operator's follow-up questions using only this context.` }],
+    parts: [{ text: `Investigation context (the only source of truth for your answers):\n${JSON.stringify(digest)}\n\nAnswer the operator's follow-up questions using only this context.` }],
   }];
   for (const turn of Array.isArray(history) ? history.slice(-MAX_HISTORY_TURNS) : []) {
     const text = typeof turn?.text === 'string' ? turn.text.trim() : '';
@@ -67,7 +79,14 @@ export async function answerFollowUp({ question, context = {}, history = [], cal
     generationConfig: { responseMimeType: 'application/json', responseSchema: ANSWER_SCHEMA, temperature: 0.2 },
   });
   const text = response?.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('') ?? '';
-  const parsed = extractJson(text);
+  let parsed;
+  try {
+    parsed = extractJson(text);
+  } catch {
+    // Refusals and safety blocks arrive as empty or non-JSON text; that is a
+    // "no grounded answer" outcome for the operator, not a service failure.
+    return { engine: 'gemini', answer: 'No grounded answer could be produced from this context for that question.', citations: [], supported: false };
+  }
   const citations = Array.isArray(parsed.citations)
     ? parsed.citations.filter((id) => validIds.has(id))
     : [];
