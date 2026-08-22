@@ -12,7 +12,12 @@ const css = await readFile('styles.css', 'utf8');
 for (const id of ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list']) {
   if (!html.includes(`id="${id}"`)) errors.push(`missing #${id}`);
 }
-if ((css.match(/{/g) ?? []).length !== (css.match(/}/g) ?? []).length) errors.push('unbalanced CSS braces');
+const cssStructural = css
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(["'])((?:\\.|(?!\1)[\s\S])*)\1/g, '');
+if ((cssStructural.match(/{/g) ?? []).length !== (cssStructural.match(/}/g) ?? []).length) {
+  errors.push('unbalanced CSS braces');
+}
 for (const asset of ['styles.css', 'app.mjs']) {
   if (!html.includes(asset)) errors.push(`unreferenced ${asset}`);
 }

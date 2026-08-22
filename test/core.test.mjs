@@ -113,3 +113,36 @@ test('falls back to escalation for a stage with no playbook', () => {
   assert.match(result.decision, /escalate to human operator/i);
   assert.deepEqual(result.actions, ['Escalate to human operator.']);
 });
+
+test('excludes weak signals from evidence entirely', () => {
+  const base = scenarios['premiere-night'];
+  const weakOnly = { ...base, signals: base.signals.map((signal) => ({ ...signal, score: 20 })) };
+  const result = investigateIncident(weakOnly);
+
+  assert.deepEqual(result.evidence, []);
+  assert.equal(result.confidence, 0);
+  assert.equal(result.rootCause.stage, 'unknown');
+  assert.match(result.decision, /escalate to human operator/i);
+});
+
+test('keeps signals at or above the evidence threshold', () => {
+  const base = scenarios['premiere-night'];
+  const incident = { ...base, signals: [{ ...base.signals[0], score: 50 }] };
+  const result = investigateIncident(incident);
+
+  assert.equal(result.evidence.length, 1);
+  assert.equal(result.confidence, 0.5);
+});
+
+test('summarizes unrecognized stage statuses as unknown', () => {
+  const summary = summarizePipeline([{ status: 'paused' }, { status: 'healthy' }]);
+
+  assert.deepEqual(summary, {
+    healthy: 1,
+    degraded: 0,
+    failed: 0,
+    waiting: 0,
+    unknown: 1,
+    total: 2,
+  });
+});

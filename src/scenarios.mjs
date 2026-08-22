@@ -6,6 +6,7 @@ export const scenarios = {
     startedAt: '20:12 UTC',
     replayAt: '20:24 UTC',
     deadline: '21:00 UTC',
+    replayWindowSec: 36 * 60,
     stages: [
       { id: 'upload', label: 'Upload', status: 'healthy', detail: 'Master received · 412\u00a0GB' },
       { id: 'ingest', label: 'Ingest', status: 'healthy', detail: 'Checksums verified' },
