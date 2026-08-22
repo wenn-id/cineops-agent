@@ -183,7 +183,7 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
   const liveExecutor = mcp ? createLiveToolExecutor({ scenario, mcp }) : null;
   const liveRegistry = new Map();
   const liveDashboards = [];
-  for (let turn = 0; turn <= maxToolTurns; turn++) {
+  for (let turn = 0; turn < maxToolTurns; turn++) {
     const response = await callModel({
       model,
       systemInstruction: SYSTEM_INSTRUCTION,

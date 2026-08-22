@@ -98,7 +98,7 @@ export const CASES = [
     expect: {
       status: 'root_cause_identified',
       rootCauseStage: 'transcode',
-      maxToolCalls: 12, // 8 bounded Gemini turns + 3 deterministic replay + margin
+      maxToolCalls: 11, // exactly 8 bounded Gemini turns + 3 deterministic replay calls
       fallbackEmitted: true,
     },
   },

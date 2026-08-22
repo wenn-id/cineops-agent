@@ -210,9 +210,9 @@ test('investigateStream: runaway tool loops are bounded and fall back', async ()
     engine: 'gemini',
     callModel: async () => modelReply([{ functionCall: { name: 'query_prometheus', args: {} } }]),
   }));
-  // 9 bounded Gemini turns, then the deterministic engine's 3 replayed calls.
+  // 8 bounded Gemini turns (the loop bound is exclusive), then the deterministic engine's 3 replayed calls.
   const toolCallCount = events.filter((item) => item.event === 'tool_call').length;
-  assert.equal(toolCallCount, 12);
+  assert.equal(toolCallCount, 11);
   const fallback = events.find((item) => item.event === 'status' && item.data.phase === 'fallback');
   assert.ok(fallback);
   const result = events.find((item) => item.event === 'result').data;
