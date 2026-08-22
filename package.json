@@ -4,12 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "lint": "node scripts/validate.mjs && node --check web/app.mjs && node --check src/core.mjs && node --check src/scenarios.mjs && node --check server/index.mjs && node --check server/agent.mjs && node --check server/static.mjs && node --check server/gemini.mjs && node --check server/gemini-agent.mjs && node --check server/grafana-mcp.mjs && node --check server/grafana-live.mjs",
+    "lint": "node scripts/validate.mjs && node --check web/app.mjs && node --check src/core.mjs && node --check src/scenarios.mjs && node --check server/index.mjs && node --check server/agent.mjs && node --check server/static.mjs && node --check server/gemini.mjs && node --check server/gemini-agent.mjs && node --check server/grafana-mcp.mjs && node --check server/grafana-live.mjs && node --check simulator/index.mjs && node --check simulator/engine.mjs",
     "test": "node --test",
     "build": "node scripts/build.mjs",
     "start": "npm run build && node server/index.mjs",
     "start:replay": "npm run build && python3 server.py",
     "start:replay:windows": "npm run build && python server.py",
+    "simulate": "node simulator/index.mjs",
+    "stack:up": "docker compose -f infra/docker-compose.yml up --build",
+    "stack:down": "docker compose -f infra/docker-compose.yml down",
     "check:gemini": "node scripts/gemini-smoke.mjs"
   },
   "engines": {

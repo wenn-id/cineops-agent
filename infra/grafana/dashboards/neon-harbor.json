@@ -1,0 +1,52 @@
+{
+  "title": "Neon Harbor — Premiere Delivery",
+  "uid": "neon-harbor",
+  "tags": ["cineops", "premiere-night"],
+  "timezone": "utc",
+  "schemaVersion": 41,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Transcode queue depth",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": null },
+      "targets": [{ "expr": "max(cineops_transcode_queue_depth)", "legendFormat": "queue depth (jobs)", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 80 }, { "color": "red", "value": 150 }] } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "GPU worker utilization",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": null },
+      "targets": [{ "expr": "avg(cineops_gpu_utilization_percent)", "legendFormat": "gpu utilization (%)", "refId": "A" }],
+      "fieldConfig": {
+        "defaults": { "unit": "percent", "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 85 }, { "color": "red", "value": 95 }] } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Subtitle processing lag",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": null },
+      "targets": [{ "expr": "max(cineops_subtitle_lag_minutes)", "legendFormat": "subtitle lag (min)", "refId": "A" }],
+      "fieldConfig": { "defaults": { "unit": "m", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 2 }, { "color": "red", "value": 4 }] } }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Encoder logs — timeout burst",
+      "type": "logs",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "loki", "uid": null },
+      "targets": [{ "expr": "{service=\"transcoder\"} |= \"deadline exceeded\"", "refId": "A" }]
+    }
+  ]
+}

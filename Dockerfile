@@ -12,6 +12,7 @@ WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0
 COPY server ./server
 COPY src ./src
+COPY simulator ./simulator
 COPY --from=build /app/dist ./dist
-EXPOSE 8080
+EXPOSE 8080 9100
 CMD ["node", "server/index.mjs"]

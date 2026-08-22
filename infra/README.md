@@ -2,6 +2,23 @@
 
 Deployment and telemetry-stack configuration for the CineOps Agent service.
 
+## Local telemetry stack (issue #31)
+
+One command brings up the living incident — Prometheus, Loki, Grafana (with a
+provisioned Neon Harbor dashboard), and the telemetry simulator:
+
+```bash
+npm run stack:up
+```
+
+- Grafana: <http://localhost:3000> (admin / cineops) — dashboard "Neon Harbor — Premiere Delivery"
+- Prometheus: <http://localhost:9090>
+- The simulator replays the incident arc (baseline → failure → recovery) on a
+  loop; `TICK_MS` / `TICK_SECONDS` in `infra/docker-compose.yml` control the pace.
+
+`npm run stack:down` tears it down; `npm run simulate` runs the simulator
+stand-alone (metrics only unless `LOKI_URL` is set).
+
 ## Deploy to Cloud Run
 
 The service is a zero-dependency Node 20 container (`Dockerfile` at the repo

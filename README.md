@@ -36,6 +36,11 @@ track of Agentic Cinema: The Blockbuster Hackathon.
 - Read-only Grafana MCP tool trace for `query_prometheus`, `query_loki_logs`,
   and `search_dashboards` — tool names match the Grafana MCP contract that the
   live client (#30) will back with real telemetry.
+- Live incident telemetry simulator (`simulator/`, issue #31): replays the
+  Neon Harbor incident as real Prometheus metrics and Loki encoder logs on a
+  loop (baseline → failure → recovery). `npm run stack:up` brings up the whole
+  observability stack — Prometheus, Loki, and Grafana with a provisioned
+  dashboard — via `infra/docker-compose.yml`.
 - Responsive, accessible, zero-dependency UI with automatic live/replay mode:
   served by the agent service it streams server-side investigations; served
   statically (e.g. GitHub Pages) it falls back to in-browser replay.
