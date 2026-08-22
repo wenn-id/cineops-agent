@@ -7,6 +7,7 @@ import { scenarios } from '../src/scenarios.mjs';
 import { investigateStream } from './agent.mjs';
 import { geminiAvailable } from './gemini.mjs';
 import { createMcpClient, mcpAvailable } from './grafana-mcp.mjs';
+import { answerFollowUp } from './followup.mjs';
 import { resolveStatic } from './static.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -100,6 +101,34 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
       }
       if (req.method === 'POST' && url.pathname === '/api/investigate') {
         await handleInvestigate(req, res);
+        return;
+      }
+      if (req.method === 'POST' && url.pathname === '/api/followup') {
+        let payload;
+        try {
+          payload = await readJsonBody(req);
+        } catch {
+          sendJson(res, 400, { error: 'invalid JSON body' });
+          return;
+        }
+        if (typeof payload?.question !== 'string' || !payload.question.trim()) {
+          sendJson(res, 400, { error: 'question is required' });
+          return;
+        }
+        if (!geminiAvailable()) {
+          sendJson(res, 503, { error: 'follow-up Q&A requires the live engine (set GEMINI_API_KEY)' });
+          return;
+        }
+        try {
+          const answer = await answerFollowUp({
+            question: payload.question,
+            context: payload.context ?? {},
+            history: payload.history,
+          });
+          sendJson(res, 200, answer);
+        } catch (error) {
+          sendJson(res, 502, { error: `follow-up failed: ${error.message}` });
+        }
         return;
       }
       if (req.method === 'GET') {

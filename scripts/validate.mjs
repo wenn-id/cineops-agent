@@ -6,6 +6,7 @@ const required = [
   'server/index.mjs', 'server/agent.mjs', 'server/static.mjs',
   'server/gemini.mjs', 'server/gemini-agent.mjs',
   'server/grafana-mcp.mjs', 'server/grafana-live.mjs',
+  'server/followup.mjs',
   'simulator/index.mjs', 'simulator/engine.mjs',
   'eval/run.mjs', 'eval/cases.mjs',
 ];
@@ -17,7 +18,7 @@ for (const file of required) {
 
 const html = await readFile('web/index.html', 'utf8');
 const css = await readFile('web/styles.css', 'utf8');
-const anchors = ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list', 'result-status', 'trace-list', 'result-reasoning'];
+const anchors = ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list', 'result-status', 'trace-list', 'result-reasoning', 'followup-form', 'followup-thread'];
 for (const id of anchors) {
   if (!html.includes(`id="${id}"`)) errors.push(`missing #${id}`);
 }

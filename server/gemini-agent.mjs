@@ -97,7 +97,7 @@ export function executeTool(scenario, name, args = {}) {
   return { error: `unknown tool: ${name}` };
 }
 
-function extractJson(text) {
+export function extractJson(text) {
   const withoutFences = text.replace(/```json\s*|```/g, '').trim();
   const start = withoutFences.indexOf('{');
   const end = withoutFences.lastIndexOf('}');

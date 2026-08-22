@@ -123,6 +123,32 @@ test('server: investigate rejects unknown scenarios and malformed bodies', async
   }
 });
 
+test('server: followup validates input and requires the live engine', async () => {
+  const { server, port } = await startServer({ port: 0 });
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    const emptyQuestion = await fetch(`${base}/api/followup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ question: '   ' }),
+    });
+    assert.equal(emptyQuestion.status, 400);
+
+    const noEngine = await fetch(`${base}/api/followup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ question: 'Why did transcode fail?', context: {} }),
+    });
+    // Without GEMINI_API_KEY the live engine is absent and the endpoint says so.
+    if (!process.env.GEMINI_API_KEY) {
+      assert.equal(noEngine.status, 503);
+      assert.match((await noEngine.json()).error, /live engine/);
+    }
+  } finally {
+    await new Promise((done) => server.close(done));
+  }
+});
+
 test('server: static serving exposes only built assets', async () => {
   const { server, port } = await startServer({ port: 0 });
   const base = `http://127.0.0.1:${port}`;

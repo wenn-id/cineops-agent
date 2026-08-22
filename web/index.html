@@ -86,6 +86,16 @@
           </div>
           <ol id="actions" class="actions"></ol>
         </article>
+
+        <div id="followup" class="followup" hidden>
+          <p class="followup-title">FOLLOW-UP · GROUNDED IN THIS INVESTIGATION</p>
+          <ol id="followup-thread" class="followup-thread" aria-live="polite"></ol>
+          <form id="followup-form" class="followup-form">
+            <label for="followup-input">Ask about this investigation</label>
+            <input id="followup-input" maxlength="220" placeholder="e.g. what happens if we skip quality control?" autocomplete="off">
+            <button id="followup-button" type="submit">Ask</button>
+          </form>
+        </div>
       </div>
 
       <aside class="evidence-panel" aria-labelledby="evidence-title">
