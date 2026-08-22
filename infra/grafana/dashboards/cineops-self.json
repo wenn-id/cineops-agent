@@ -27,7 +27,8 @@
       "targets": [
         { "expr": "sum(increase(cineops_investigations_completed_total{outcome=\"completed\"}[5m]))", "legendFormat": "completed", "refId": "A" },
         { "expr": "sum(increase(cineops_investigations_completed_total{outcome=\"aborted\"}[5m]))", "legendFormat": "aborted", "refId": "B" },
-        { "expr": "sum(increase(cineops_investigations_failed_total[5m]))", "legendFormat": "failed", "refId": "C" }
+        { "expr": "sum(increase(cineops_investigations_failed_total[5m]))", "legendFormat": "failed", "refId": "C" },
+        { "expr": "sum(increase(cineops_investigations_completed_total{engine=\"deterministic\"}[5m])) - sum(increase(cineops_investigations_total{engine=\"deterministic\"}[5m]))", "legendFormat": "gemini→fallback", "refId": "D", "hide": true }
       ],
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
     },
@@ -38,7 +39,8 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "datasource": { "type": "prometheus", "uid": null },
       "targets": [
-        { "expr": "sum by (supported) (increase(cineops_followups_total[5m]))", "legendFormat": "supported={{supported}}", "refId": "A" }
+        { "expr": "sum by (supported) (increase(cineops_followups_total[5m]))", "legendFormat": "supported={{supported}}", "refId": "A" },
+        { "expr": "sum(increase(cineops_followups_failed_total[5m]))", "legendFormat": "failed", "refId": "B" }
       ],
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
     },

@@ -106,24 +106,29 @@ async function handleInvestigate(req, res, { consumeAllowance } = {}) {
   });
   const abort = new AbortController();
   res.on('close', () => abort.abort());
+  let actualEngine = engineName;
   // Live Grafana telemetry needs the live engine: without a Gemini key the
   // deterministic engine runs on fixture data and MCP is not dialed at all.
   const mcp = geminiAvailable() && mcpAvailable() ? createMcpClient({ signal: abort.signal }) : undefined;
   try {
     for await (const message of investigateStream(scenario, query, { signal: abort.signal, mcp })) {
       if (abort.signal.aborted || res.destroyed) break;
+      if (message.event === 'status' && message.data?.phase === 'fallback') actualEngine = 'deterministic';
       if (message.event === 'result') {
+        if (message.data?.engine === 'gemini') actualEngine = 'gemini';
         const investigationRef = rememberInvestigation(scenarioKey, message.data);
         message.data = { ...message.data, investigationRef };
       }
       res.write(`event: ${message.event}\ndata: ${JSON.stringify(message.data)}\n\n`);
     }
+    const outcome = abort.signal.aborted || res.destroyed ? 'aborted' : 'completed';
     logEvent('info', 'investigate.end', {
       requestId,
       durationMs: Math.round(Date.now() - startedAt),
-      outcome: abort.signal.aborted || res.destroyed ? 'aborted' : 'completed',
+      outcome,
+      engine: actualEngine,
     });
-    incrementMetric('cineops_investigations_completed_total', { outcome: abort.signal.aborted || res.destroyed ? 'aborted' : 'completed' });
+    incrementMetric('cineops_investigations_completed_total', { engine: actualEngine, outcome });
   } catch (error) {
     logEvent('error', 'investigate.error', { requestId, message: error.message });
     incrementMetric('cineops_investigations_failed_total');
@@ -244,6 +249,7 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
           sendJson(res, 200, answer);
         } catch (error) {
           logEvent('error', 'followup.error', { message: error.message });
+          incrementMetric('cineops_followups_failed_total');
           sendJson(res, error.statusCode ?? 502, { error: `follow-up failed: ${error.message}` });
         }
         return;
