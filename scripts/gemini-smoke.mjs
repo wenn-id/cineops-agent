@@ -12,11 +12,12 @@ const response = await callGemini({
   generationConfig: { maxOutputTokens: 10, temperature: 0 },
 });
 
-const text = response?.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('');
-if (text) {
-  console.log(`Gemini (${DEFAULT_MODEL}) replied: ${JSON.stringify(text.trim())}`);
+const text = response?.candidates?.[0]?.content?.parts?.map((part) => part.text ?? '').join('').trim() ?? '';
+if (/^ok\.?$/i.test(text)) {
+  console.log(`Gemini (${DEFAULT_MODEL}) replied: ${JSON.stringify(text)}`);
   console.log('Wiring OK — the agent service will run the Gemini engine.');
 } else {
-  console.error('Unexpected response:', JSON.stringify(response).slice(0, 300));
+  console.error(`Expected exactly "ok" but Gemini replied: ${JSON.stringify(text) || '(empty)'}`);
+  console.error('Full response:', JSON.stringify(response).slice(0, 300));
   process.exit(1);
 }

@@ -104,15 +104,17 @@ function extractJson(text) {
   return JSON.parse(withoutFences.slice(start, end + 1));
 }
 
-// The model may only cite evidence that exists in the incident data: fixture
-// values override anything the model produced, so numbers can never be invented.
-function assembleResult(scenario, query, parsed, executedToolCalls) {
+// The model may only cite evidence that the executed tools actually returned:
+// fixture values override anything the model produced, so numbers can never be
+// invented, and ids outside the tool-grounded set are rejected even when they
+// exist in the scenario, so unqueried signals cannot pass as evidence.
+function assembleResult(scenario, query, parsed, executedToolCalls, groundedIds = new Set()) {
   const signalsById = new Map(scenario.signals.map((signal) => [signal.id, signal]));
   const evidence = [];
   const seen = new Set();
   for (const item of Array.isArray(parsed.evidence) ? parsed.evidence : []) {
     const signal = signalsById.get(item?.id);
-    if (!signal || seen.has(signal.id)) continue;
+    if (!signal || seen.has(signal.id) || !groundedIds.has(signal.id)) continue;
     seen.add(signal.id);
     const finding = typeof item.finding === 'string' && item.finding.trim() ? item.finding : signal.finding;
     evidence.push({ ...signal, finding });
@@ -165,6 +167,7 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
   }];
 
   const executed = [];
+  const groundedIds = new Set();
   for (let turn = 0; turn <= maxToolTurns; turn++) {
     const response = await callModel({
       model,
@@ -184,6 +187,7 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
       const responses = [];
       for (const call of functionCalls) {
         const toolResult = executeTool(scenario, call.name, call.args);
+        for (const signal of toolResult.signals ?? []) groundedIds.add(signal.id);
         executed.push({ name: call.name, args: call.args ?? {} });
         yield {
           event: 'tool_call',
@@ -197,7 +201,7 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
 
     const parsed = extractJson(parts.map((part) => part.text ?? '').join(''));
     yield { event: 'status', data: { phase: 'concluding', engine: 'gemini', label: 'Correlating evidence into a verdict…' } };
-    const result = assembleResult(scenario, query, parsed, executed);
+    const result = assembleResult(scenario, query, parsed, executed, groundedIds);
     for (const item of result.evidence) {
       yield { event: 'observation', data: item };
     }

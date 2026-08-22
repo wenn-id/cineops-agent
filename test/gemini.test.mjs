@@ -65,8 +65,17 @@ test('gemini loop: tool calls are executed and the verdict streams through the e
   assert.ok(result.reasoning.length > 10);
 });
 
-test('gemini loop: hallucinated evidence ids are dropped, fixture values win', async () => {
-  const turns = [finalVerdict()];
+test('gemini loop: hallucinated and unqueried evidence ids are dropped, fixture values win', async () => {
+  // subtitle-lag exists in the fixture but no tool queried the subtitles
+  // stage — it must not pass as grounded evidence either.
+  const turns = [
+    modelReply([{ functionCall: { name: 'query_prometheus', args: { stage: 'transcode' } } }]),
+    finalVerdict({ evidence: [
+      { id: 'queue-depth', finding: 'Queue depth is 7.8x baseline — the primary blocker.' },
+      { id: 'made-up-signal' },
+      { id: 'subtitle-lag' },
+    ] }),
+  ];
   const events = await collect(geminiInvestigation({ scenario, query: 'q', callModel: async () => turns.shift() }));
   const result = events.find((item) => item.event === 'result').data;
 
@@ -76,6 +85,13 @@ test('gemini loop: hallucinated evidence ids are dropped, fixture values win', a
   assert.equal(queueDepth.value, fixture.value);
   assert.equal(queueDepth.query, fixture.query);
   assert.equal(queueDepth.finding, 'Queue depth is 7.8x baseline — the primary blocker.');
+});
+
+test('gemini loop: verdicts without any tool calls yield no evidence', async () => {
+  const turns = [finalVerdict()];
+  const events = await collect(geminiInvestigation({ scenario, query: 'q', callModel: async () => turns.shift() }));
+  const result = events.find((item) => item.event === 'result').data;
+  assert.deepEqual(result.evidence, []);
 });
 
 test('gemini loop: function responses carry the executed tool data back to the model', async () => {
