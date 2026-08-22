@@ -35,6 +35,7 @@ export function createMcpClient({
   if (!url) throw new Error('GRAFANA_URL is not set');
   let sessionId;
   let nextRequestId = 1;
+  let initialization;
 
   async function rpc(method, params, { notification = false } = {}) {
     const message = { jsonrpc: '2.0', method, ...(params !== undefined ? { params } : {}) };
@@ -64,17 +65,32 @@ export function createMcpClient({
     return body.result;
   }
 
+  // The handshake is valid once per session: initialize lazily on the first
+  // tool call and reuse the session afterwards; a failed handshake resets so
+  // the next call can retry.
+  function ensureInitialized() {
+    initialization ??= (async () => {
+      try {
+        await rpc('initialize', {
+          protocolVersion: '2025-03-26',
+          capabilities: {},
+          clientInfo: { name: 'cineops-agent', version: '0.1.0' },
+        });
+        await rpc('notifications/initialized', undefined, { notification: true });
+      } catch (error) {
+        initialization = undefined;
+        throw error;
+      }
+    })();
+    return initialization;
+  }
+
   return {
     async callTool(name, args = {}) {
       if (!MCP_READ_ONLY_TOOLS.has(name)) {
         throw new Error(`tool not in the read-only allowlist: ${name}`);
       }
-      await rpc('initialize', {
-        protocolVersion: '2025-03-26',
-        capabilities: {},
-        clientInfo: { name: 'cineops-agent', version: '0.1.0' },
-      });
-      await rpc('notifications/initialized', undefined, { notification: true });
+      await ensureInitialized();
       const result = await rpc('tools/call', { name, arguments: args });
       if (!result || !Array.isArray(result.content)) {
         throw new Error(`Grafana MCP returned no content for ${name}`);

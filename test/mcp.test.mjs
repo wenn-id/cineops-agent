@@ -53,9 +53,10 @@ test('mcp client: initialize handshake, session header, bearer auth, tools/call'
 
   const client = createMcpClient({ url: 'https://mcp.example/mcp', token: 'tok', fetchImpl });
   const contents = await client.callTool('query_prometheus', { promql: 'max(cineops_transcode_queue_depth)' });
+  await client.callTool('query_loki_logs', { logql: '{service="transcoder"}' });
 
   assert.equal(contents[0].result[0].value[1], '186');
-
+  assert.equal(calls.length, 4, 'second call must reuse the session — no re-initialize');
   assert.equal(calls[0].body.method, 'initialize');
   assert.equal(calls[1].body.method, 'notifications/initialized');
   assert.ok(!('id' in calls[1].body), 'notifications carry no id');
@@ -64,6 +65,8 @@ test('mcp client: initialize handshake, session header, bearer auth, tools/call'
   assert.equal(calls[2].body.params.arguments.promql, 'max(cineops_transcode_queue_depth)');
   assert.equal(calls[2].init.headers['mcp-session-id'], 'sess-42');
   assert.equal(calls[2].init.headers.authorization, 'Bearer tok');
+  assert.equal(calls[3].body.method, 'tools/call', 'subsequent calls skip the handshake');
+  assert.equal(calls[3].init.headers['mcp-session-id'], 'sess-42');
 });
 
 test('mcp client: parses SSE-framed JSON-RPC responses', async () => {
@@ -121,6 +124,22 @@ test('live executor: one MCP call per scenario query, live values flagged', asyn
   const kept = await unextractable('query_prometheus', { stage: 'transcode' });
   assert.ok(kept.signals.every((signal) => signal.liveValue === false));
   assert.equal(kept.signals[0].value, scenario.signals[0].value);
+
+  const flaky = createLiveToolExecutor({
+    scenario,
+    mcp: {
+      callTool: async (name, args) => {
+        if (String(args.promql ?? '').includes('gpu')) throw new Error('upstream 503');
+        return parsedPrometheus(240);
+      },
+    },
+  });
+  const mixed = await flaky('query_prometheus', { stage: 'transcode' });
+  assert.equal(mixed.signals.length, 2, 'a failing query must not drop the other live results');
+  assert.deepEqual(mixed.signals.map((signal) => signal.liveValue), [true, false]);
+  assert.equal(mixed.signals[0].value, 240);
+  assert.equal(mixed.signals[1].value, scenario.signals[1].value, 'failed target keeps the fixture value');
+  assert.match(mixed.signals[1].liveError, /503/);
 
   const dashboards = await execute('search_dashboards', { query: 'transcode' });
   assert.deepEqual(dashboards.dashboards, [{ title: 'transcode — overview', url: '/d/transcode' }]);

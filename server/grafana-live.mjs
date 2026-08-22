@@ -53,9 +53,15 @@ export function createLiveToolExecutor({ scenario, mcp }) {
       );
       const signals = [];
       for (const target of targets) {
-        const contents = await mcp.callTool(name, { [queryKey]: target.query });
-        const liveValue = extractNumber(contents);
-        signals.push({ ...target, ...(liveValue !== null ? { value: liveValue, liveValue: true } : { liveValue: false }) });
+        // A single failing query must not discard the other live results:
+        // keep the fixture signal with explicit provenance and continue.
+        try {
+          const contents = await mcp.callTool(name, { [queryKey]: target.query });
+          const liveValue = extractNumber(contents);
+          signals.push({ ...target, ...(liveValue !== null ? { value: liveValue, liveValue: true } : { liveValue: false }) });
+        } catch (error) {
+          signals.push({ ...target, liveValue: false, liveError: String(error.message ?? error).slice(0, 120) });
+        }
       }
       return { stage: args.stage ?? 'all', signals };
     }
