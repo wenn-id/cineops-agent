@@ -7,13 +7,14 @@ import { createServer } from 'node:http';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { formatMetrics, logBatch, metricsSnapshot, scenarios } from './engine.mjs';
+import { arcFraction, formatMetrics, logBatch, metricsSnapshot, scenarios } from './engine.mjs';
 
 const SCENARIO_ID = process.env.SCENARIO ?? 'premiere-night';
 const METRICS_PORT = Number(process.env.METRICS_PORT ?? 9100);
 const LOKI_URL = process.env.LOKI_URL ?? ''; // empty = metrics only
 const TICK_MS = Number(process.env.TICK_MS ?? 5000);
 const TICK_SECONDS = Number(process.env.TICK_SECONDS ?? 60);
+const RECOVERY_SECONDS = Number(process.env.RECOVERY_SECONDS ?? 6 * TICK_SECONDS);
 
 const scenario = scenarios[SCENARIO_ID];
 if (!scenario) throw new Error(`unknown scenario: ${SCENARIO_ID}`);
@@ -22,8 +23,7 @@ let tick = 0;
 
 function state() {
   const elapsed = tick * TICK_SECONDS;
-  const fraction = Math.min(1, elapsed / scenario.replayWindowSec);
-  return { elapsed, fraction };
+  return { elapsed, ...arcFraction(elapsed, scenario.replayWindowSec, RECOVERY_SECONDS) };
 }
 
 async function pushToLoki(batch) {
@@ -58,8 +58,11 @@ const server = createServer((req, res) => {
 });
 
 export function startSimulator({ port = METRICS_PORT, host = '0.0.0.0' } = {}) {
-  return new Promise((resolvePromise) => {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const failFast = (error) => rejectPromise(error);
+    server.once('error', failFast);
     server.listen(port, host, () => {
+      server.off('error', failFast);
       console.log(`CineOps simulator (${SCENARIO_ID}) metrics on :${server.address().port}${LOKI_URL ? `, logs → ${LOKI_URL}` : ''}`);
       resolvePromise({ server, port: server.address().port, host });
     });
@@ -70,10 +73,9 @@ const isMainEntry = process.argv[1] && import.meta.url === pathToFileURL(resolve
 if (isMainEntry) {
   await startSimulator();
   setInterval(async () => {
-    const { fraction, elapsed } = state();
-    await pushToLoki(logBatch(scenario, fraction, tick));
-    if (elapsed >= scenario.replayWindowSec + 5 * TICK_SECONDS) {
-      tick = 0; // incident recovers, then repeats for the next viewer
+    await pushToLoki(logBatch(scenario, state().fraction, tick));
+    if (state().phase === 'complete') {
+      tick = 0; // arc restarts: baseline → incident → recovery → baseline
     } else {
       tick += 1;
     }

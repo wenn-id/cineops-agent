@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { scenarios } from '../src/scenarios.mjs';
-import { formatMetrics, logBatch, metricNameFromQuery, metricsSnapshot, valueAt } from '../simulator/engine.mjs';
+import { arcFraction, formatMetrics, logBatch, metricNameFromQuery, metricsSnapshot, valueAt } from '../simulator/engine.mjs';
 import { startSimulator } from '../simulator/index.mjs';
 
 const scenario = scenarios['premiere-night'];
@@ -45,6 +45,37 @@ test('engine: log burst grows with the incident fraction', () => {
   assert.ok(peak.length >= developing.length);
   assert.match(developing[0].line, /deadline exceeded/);
   assert.equal(developing[0].labels.service, 'transcoder');
+});
+
+test('engine: the incident arc ramps up, recovers, then completes', () => {
+  const windowSec = 36 * 60;
+  const recoverySec = 6 * 60;
+
+  assert.deepEqual(arcFraction(0, windowSec, recoverySec), { fraction: 0, phase: 'incident' });
+  assert.equal(arcFraction(windowSec / 2, windowSec, recoverySec).phase, 'incident');
+  const peak = arcFraction(windowSec, windowSec, recoverySec);
+  assert.deepEqual(peak, { fraction: 1, phase: 'incident' });
+
+  const recovering = arcFraction(windowSec + recoverySec / 2, windowSec, recoverySec);
+  assert.equal(recovering.phase, 'recovery');
+  assert.ok(recovering.fraction > 0 && recovering.fraction < 1, 'recovery must descend gradually, not snap to zero');
+
+  assert.deepEqual(arcFraction(windowSec + recoverySec + 1, windowSec, recoverySec), { fraction: 0, phase: 'complete' });
+
+  const queueDepth = scenario.signals.find((signal) => signal.id === 'queue-depth');
+  assert.ok(valueAt(queueDepth, recovering.fraction, 9) < valueAt(queueDepth, 1, 9), 'recovered values fall back toward baseline');
+});
+
+test('simulator: startup rejects cleanly when the port is taken', async () => {
+  const first = await startSimulator({ port: 0, host: '127.0.0.1' });
+  try {
+    await assert.rejects(
+      () => startSimulator({ port: first.port, host: '127.0.0.1' }),
+      /EADDRINUSE|EACCES/i,
+    );
+  } finally {
+    await new Promise((done) => first.server.close(done));
+  }
 });
 
 test('simulator: /metrics serves the exposition over HTTP', async () => {

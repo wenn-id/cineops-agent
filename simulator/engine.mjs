@@ -65,4 +65,18 @@ export function logBatch(scenario, fraction, tick) {
   return lines.map((line) => ({ labels: { service: 'transcoder', stage: 'transcode', job: 'cineops-simulator' }, line }));
 }
 
+// Incident arc: ramp up over the replay window, then a real recovery descent
+// back to baseline before the arc completes and restarts. A sustained peak
+// with an abrupt reset would not be honest recovery telemetry.
+export function arcFraction(elapsed, windowSec, recoverySec) {
+  if (elapsed <= windowSec) {
+    return { fraction: Math.min(1, elapsed / windowSec), phase: 'incident' };
+  }
+  const recoveryFraction = 1 - (elapsed - windowSec) / recoverySec;
+  if (recoveryFraction > 0) {
+    return { fraction: recoveryFraction, phase: 'recovery' };
+  }
+  return { fraction: 0, phase: 'complete' };
+}
+
 export { scenarios };

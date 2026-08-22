@@ -76,8 +76,8 @@ gcloud run deploy cineops-agent \
 
 ```bash
 docker build -t cineops-agent .
-docker run --rm -p 8000:8000 cineops-agent
-# open http://127.0.0.1:8000 — should report LIVE SERVICE
+docker run --rm -p 8080:8080 cineops-agent
+# open http://127.0.0.1:8080 — should report LIVE SERVICE
 ```
 
 ## Planned
