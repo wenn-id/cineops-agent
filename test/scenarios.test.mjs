@@ -15,6 +15,8 @@ const EXPECTED_ROOT_CAUSES = {
 test('scenario library: every scenario validates and investigates to its designed root cause', () => {
   assert.equal(Object.keys(scenarios).length, 4, 'the library ships four scenarios');
   for (const [id, scenario] of Object.entries(scenarios)) {
+    assert.equal(typeof scenario.hook, 'string', `${id} needs a hero hook`);
+    assert.equal(typeof scenario.defaultQuery, 'string', `${id} needs a default operator query`);
     const result = investigateIncident(scenario, `What is wrong with ${id}?`);
     assert.equal(result.status, 'root_cause_identified', `${id} must reach a root cause`);
     assert.equal(result.rootCause.stage, EXPECTED_ROOT_CAUSES[id], `${id} root cause stage`);

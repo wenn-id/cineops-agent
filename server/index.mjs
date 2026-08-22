@@ -79,6 +79,10 @@ async function handleInvestigate(req, res) {
   }
   const query = payload.query;
 
+  // Follow-ups resolve the scenario by its library key (payload.scenarioId),
+  // so the store must keep that key — not the scenario's display id.
+  const scenarioKey = payload.scenarioId;
+
   res.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
     'cache-control': 'no-cache',
@@ -94,7 +98,7 @@ async function handleInvestigate(req, res) {
     for await (const message of investigateStream(scenario, query, { signal: abort.signal, mcp })) {
       if (abort.signal.aborted || res.destroyed) break;
       if (message.event === 'result') {
-        const investigationRef = rememberInvestigation(scenario.id, message.data);
+        const investigationRef = rememberInvestigation(scenarioKey, message.data);
         message.data = { ...message.data, investigationRef };
       }
       res.write(`event: ${message.event}\ndata: ${JSON.stringify(message.data)}\n\n`);
@@ -132,6 +136,7 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
           engine: geminiAvailable() ? 'gemini' : 'deterministic',
           mcp: mcpAvailable(),
           simulator: simulatorAvailable(),
+          simulatorScenario: simulatorAvailable() ? (process.env.SIMULATOR_SCENARIO ?? 'premiere-night') : undefined,
           replayAvailable: true,
         });
         return;

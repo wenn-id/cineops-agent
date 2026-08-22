@@ -18,7 +18,7 @@ for (const file of required) {
 
 const html = await readFile('web/index.html', 'utf8');
 const css = await readFile('web/styles.css', 'utf8');
-const anchors = ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list', 'result-status', 'trace-list', 'result-reasoning', 'followup-form', 'followup-thread', 'recovery', 'approve-recovery', 'reject-recovery', 'scenario-select', 'incident-eyebrow'];
+const anchors = ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list', 'result-status', 'trace-list', 'result-reasoning', 'followup-form', 'followup-thread', 'recovery', 'approve-recovery', 'reject-recovery', 'scenario-select', 'incident-eyebrow', 'hero-hook', 'hero-deadline'];
 for (const id of anchors) {
   if (!html.includes(`id="${id}"`)) errors.push(`missing #${id}`);
 }

@@ -11,6 +11,7 @@ const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => (
 let liveMode = false;
 let liveEngine = 'deterministic';
 let liveSimulator = false;
+let liveSimulatorScenario;
 let lastResult = null;
 let followupGeneration = 0;
 const followupHistory = [];
@@ -31,6 +32,7 @@ async function detectLiveMode() {
       liveMode = true;
       liveEngine = health.engine === 'gemini' ? 'gemini' : 'deterministic';
       liveSimulator = health.simulator === true;
+      liveSimulatorScenario = health.simulatorScenario;
       setModeIndicator();
     }
   } catch {
@@ -276,10 +278,11 @@ function stopRecoveryPolling() {
 
 function showRecoveryPanel() {
   stopRecoveryPolling();
-  // Recovery is a live drill: without the simulator there is nothing to
-  // execute, and the panel must not offer an action that can only 503.
-  $('#recovery').hidden = !(liveMode && liveSimulator);
-  if (!(liveMode && liveSimulator)) return;
+  // Recovery is a live drill bound to the simulator's scenario: the panel
+  // only appears when the selected incident matches the drilled one.
+  const drillReady = liveMode && liveSimulator && scenarioId === liveSimulatorScenario;
+  $('#recovery').hidden = !drillReady;
+  if (!drillReady) return;
   $('#recovery-title').textContent = 'RECOVERY PLAN · NEEDS YOUR APPROVAL';
   $('#recovery-status').textContent = 'Approve the agent\u2019s plan to execute it against the live pipeline, or reject to escalate to a human operator.';
   $('#approve-recovery').disabled = false;
@@ -418,6 +421,9 @@ renderPipeline();
 setModeIndicator();
 startCountdown();
 $('#incident-eyebrow').textContent = `INCIDENT REPLAY · ${scenario.id}`;
+$('#hero-hook').textContent = scenario.hook ?? 'Save the delivery.';
+$('#hero-deadline').textContent = scenario.deadline;
+$('#operator-query').value = scenario.defaultQuery ?? '';
 const scenarioSelect = $('#scenario-select');
 scenarioSelect.innerHTML = Object.entries(scenarios)
   .map(([id, entry]) => `<option value="${escapeHtml(id)}"${id === scenarioId ? ' selected' : ''}>${escapeHtml(entry.production)}</option>`)

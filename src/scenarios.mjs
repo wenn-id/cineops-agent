@@ -1,6 +1,8 @@
 export const scenarios = {
   'premiere-night': {
     id: 'INC-042',
+    hook: 'Save premiere.',
+    defaultQuery: 'Can we still make the 21:00 premiere? Find the root cause and safest recovery path.',
     title: 'Premiere delivery blocked',
     production: 'Neon Harbor — Episode 06',
     startedAt: '20:12 UTC',
@@ -91,6 +93,8 @@ export const scenarios = {
 
   'storage-surge': {
     id: 'INC-043',
+    hook: 'Save the archive drop.',
+    defaultQuery: 'Hot tier is nearly full. What is at risk for the archive drop, and how do we free capacity fast?',
     title: 'Ingest storage full during archive drop',
     production: 'Desert Frequency — S02E11',
     startedAt: '09:03 UTC',
@@ -174,6 +178,8 @@ export const scenarios = {
 
   'subtitle-drift': {
     id: 'INC-044',
+    hook: 'Save localization.',
+    defaultQuery: 'Why are the subtitles drifting, and can we still ship the localization on time?',
     title: 'Subtitle drift on live localization',
     production: 'Harbor Lights — Finale',
     startedAt: '18:40 UTC',
@@ -257,6 +263,8 @@ export const scenarios = {
 
   'cdn-origin-storm': {
     id: 'INC-045',
+    hook: 'Save publishing.',
+    defaultQuery: 'Publishing is failing at the CDN. What is failing and how do we stabilize it?',
     title: 'Publish failing on CDN origin errors',
     production: 'Midnight Circuit — Episode 02',
     startedAt: '21:05 UTC',

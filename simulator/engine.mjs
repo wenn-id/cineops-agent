@@ -51,18 +51,23 @@ export function formatMetrics(metrics) {
   return `${lines.join('\n')}\n`;
 }
 
-// Encoder timeout log lines: sparse before the incident, a burst afterwards.
+// Log bursts derive from the scenario's Loki signal: the service label and
+// the match token come straight from its LogQL query, so the streamed lines
+// are the ones the scenario's own dashboards and agents search for.
 export function logBatch(scenario, fraction, tick) {
   const errorSignal = scenario.signals.find((signal) => signal.source === 'Loki');
   if (!errorSignal) return [];
+  const service = /service="([^"]+)"/.exec(errorSignal.query)?.[1] ?? errorSignal.stage;
+  const matchToken = /\|=\s*"([^"]+)"/.exec(errorSignal.query)?.[1] ?? 'error';
+  const stage = /stage="([^"]+)"/.exec(errorSignal.query)?.[1] ?? errorSignal.stage;
   const rampStart = 0.15;
   const burst = fraction <= rampStart ? 0 : Math.round((fraction - rampStart) * 12) + 1;
   const lines = [];
   for (let index = 0; index < burst; index++) {
     const jobId = 4100 + ((tick * 13 + index * 7) % 96);
-    lines.push(`level=error ts=2026-08-22T20:${String(12 + tick % 48).padStart(2, '0')}:00Z caller=encoder.go:214 job_id=${jobId} codec=hevc resolution=4k msg="transcode deadline exceeded" attempt=3 backoff=2.75s`);
+    lines.push(`level=error stage=${stage} service=${service} job_id=${jobId} msg="${matchToken}" detail="${errorSignal.label}"`);
   }
-  return lines.map((line) => ({ labels: { service: 'transcoder', stage: 'transcode', job: 'cineops-simulator' }, line }));
+  return lines.map((line) => ({ labels: { service, stage, job: 'cineops-simulator' }, line }));
 }
 
 // Incident arc: ramp up over the replay window, then a real recovery descent

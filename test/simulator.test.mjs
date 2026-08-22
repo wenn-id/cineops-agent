@@ -37,14 +37,19 @@ test('engine: snapshots format as a valid Prometheus exposition', () => {
   }
 });
 
-test('engine: log burst grows with the incident fraction', () => {
+test('engine: log bursts derive from each scenario\'s Loki signal', () => {
   assert.deepEqual(logBatch(scenario, 0.05, 1), []);
   const developing = logBatch(scenario, 0.5, 5);
   const peak = logBatch(scenario, 1, 8);
   assert.ok(developing.length > 0);
   assert.ok(peak.length >= developing.length);
-  assert.match(developing[0].line, /deadline exceeded/);
+  assert.match(developing[0].line, /msg="deadline exceeded"/);
   assert.equal(developing[0].labels.service, 'transcoder');
+
+  const storage = logBatch(scenarios['storage-surge'], 1, 3);
+  assert.equal(storage[0].labels.service, 'ingest');
+  assert.match(storage[0].line, /no space left on device/);
+  assert.match(storage[0].line, /stage=ingest/);
 });
 
 test('engine: the incident arc ramps up, recovers, then completes', () => {

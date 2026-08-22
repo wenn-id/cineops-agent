@@ -19,6 +19,7 @@ services:
       dockerfile: Dockerfile
     environment:
       SIMULATOR_URL: http://simulator:9100
+      SIMULATOR_SCENARIO: premiere-night
     ports:
       - "8080:8080"
     depends_on:

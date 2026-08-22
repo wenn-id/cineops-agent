@@ -187,7 +187,10 @@ footer { border-top: 1px solid var(--line); padding: 22px 3.2vw; display: flex; 
 
 @media (max-width: 900px) {
   .topbar { grid-template-columns: 1fr auto; }
-  .production-id { display: none; }
+  /* The scenario switcher stays reachable on small screens — it is the only
+     navigation between incidents. */
+  .production-id { text-align: left; }
+  .production-id select { max-width: 130px; font-size: 10px; }
   .hero { grid-template-columns: 1fr; gap: 50px; }
   .pipeline-stages { grid-template-columns: repeat(3, 1fr); gap: 32px 0; }
   .pipeline-stages::before { display: none; }
