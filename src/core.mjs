@@ -98,8 +98,8 @@ export function investigateIncident(incident, query = 'What is blocking this pro
   return {
     incidentId: incident.id,
     query,
-    status: failedStage ? 'root_cause_identified' : 'monitoring',
-    severity: failedStage ? 'critical' : 'warning',
+    status: failedStage && evidence.length ? 'root_cause_identified' : 'monitoring',
+    severity: failedStage && evidence.length ? 'critical' : 'warning',
     confidence,
     rootCause: {
       stage: targetStage,

@@ -33,6 +33,7 @@ function renderEvidence(result) {
 }
 
 function renderResult(result) {
+  $('#result-status').textContent = result.status === 'root_cause_identified' ? 'ROOT CAUSE IDENTIFIED' : 'MONITORING';
   $('#confidence').textContent = `${Math.round(result.confidence * 100)}% confidence`;
   $('#root-cause').textContent = result.rootCause.finding;
   $('#decision').textContent = result.decision;

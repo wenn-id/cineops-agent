@@ -122,6 +122,8 @@ test('excludes weak signals from evidence entirely', () => {
   assert.deepEqual(result.evidence, []);
   assert.equal(result.confidence, 0);
   assert.equal(result.rootCause.stage, 'unknown');
+  assert.equal(result.status, 'monitoring');
+  assert.equal(result.severity, 'warning');
   assert.match(result.decision, /escalate to human operator/i);
 });
 

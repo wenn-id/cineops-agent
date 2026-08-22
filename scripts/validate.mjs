@@ -9,7 +9,7 @@ for (const file of required) {
 
 const html = await readFile('index.html', 'utf8');
 const css = await readFile('styles.css', 'utf8');
-for (const id of ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list']) {
+for (const id of ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list', 'result-status']) {
   if (!html.includes(`id="${id}"`)) errors.push(`missing #${id}`);
 }
 const cssStructural = css
@@ -26,4 +26,4 @@ if (errors.length) {
   console.error(errors.join('\n'));
   process.exit(1);
 }
-console.log(`Validated ${required.length} files, 4 UI anchors, CSS balance, and local assets.`);
+console.log(`Validated ${required.length} files, 5 UI anchors, CSS balance, and local assets.`);
