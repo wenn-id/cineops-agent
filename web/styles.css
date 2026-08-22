@@ -93,6 +93,23 @@ h2 { margin: 0; font-size: clamp(1.4rem, 2.4vw, 2.1rem); letter-spacing: -.04em;
 .agent-progress { display: flex; align-items: center; gap: 15px; min-height: 76px; border-bottom: 1px solid var(--line); }
 .agent-progress span { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #384038; border-top-color: var(--acid); animation: spin .8s linear infinite; }
 .agent-progress p { margin: 0; color: var(--muted); font: 500 10px/1 ui-monospace, monospace; }
+
+.agent-trace { border-bottom: 1px solid var(--line); }
+.agent-trace .trace-title { margin: 0; padding: 11px 0 9px; color: var(--muted); font: 700 8px/1 ui-monospace, monospace; letter-spacing: .14em; }
+.agent-trace ol { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 1px; }
+.agent-trace li { display: grid; grid-template-columns: 42px 52px 1fr; gap: 10px; padding: 7px 9px; background: #090b09; border: 1px solid #1d211d; font: 500 9px/1.5 ui-monospace, monospace; animation: reveal .3s both; }
+.agent-trace li time { color: #667066; }
+.agent-trace li em { font-style: normal; letter-spacing: .08em; text-transform: uppercase; }
+.agent-trace li[data-kind="phase"] em { color: var(--blue); }
+.agent-trace li[data-kind="thought"] em { color: var(--acid); }
+.agent-trace li[data-kind="thought"] span { color: #d7dcd4; }
+.agent-trace li[data-kind="tool"] em { color: var(--green); }
+.agent-trace li[data-kind="replay"] em { color: var(--amber); }
+
+.result-reasoning { margin: 26px 0 0; border: 1px solid var(--line); border-left: 2px solid var(--acid); background: var(--panel); padding: 14px 16px; }
+.result-reasoning span { display: block; color: var(--muted); font: 700 8px/1 ui-monospace, monospace; letter-spacing: .14em; margin-bottom: 8px; }
+.result-reasoning p { margin: 0; color: #bec4bd; font-size: 12px; line-height: 1.65; }
+
 .agent-result { margin-top: 30px; animation: reveal .5s both; }
 .result-kicker { display: flex; justify-content: space-between; gap: 16px; color: var(--red); font: 700 8px/1 ui-monospace, monospace; letter-spacing: .13em; }
 .result-kicker strong { color: var(--acid); }

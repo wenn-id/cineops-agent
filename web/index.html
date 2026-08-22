@@ -71,10 +71,19 @@
           <span></span><p id="progress-label">Connecting to Grafana MCP…</p>
         </div>
 
+        <div id="agent-trace" class="agent-trace" hidden>
+          <p class="trace-title">AGENT TRACE</p>
+          <ol id="trace-list" aria-live="polite"></ol>
+        </div>
+
         <article id="agent-result" class="agent-result" hidden aria-live="polite">
           <div class="result-kicker"><span id="result-status">ROOT CAUSE IDENTIFIED</span><strong id="confidence"></strong></div>
           <h3 id="root-cause"></h3>
           <p id="decision"></p>
+          <div id="result-reasoning" class="result-reasoning" hidden>
+            <span>WHY THIS VERDICT</span>
+            <p id="reasoning-text"></p>
+          </div>
           <ol id="actions" class="actions"></ol>
         </article>
       </div>

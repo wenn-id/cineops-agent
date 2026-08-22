@@ -188,6 +188,12 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
     const functionCalls = parts.filter((part) => part.functionCall).map((part) => part.functionCall);
 
     if (functionCalls.length) {
+      // The model sometimes explains what it is about to query — surface that
+      // thinking as trace events; it is the agent's voice during the loop.
+      const thought = parts.map((part) => part.text ?? '').join('').trim();
+      if (thought) {
+        yield { event: 'thought', data: { text: thought.slice(0, 500) } };
+      }
       contents.push({ role: 'model', parts });
       // Parallel calls in one model turn must come back as a single content
       // holding every functionResponse, per the Gemini contract.

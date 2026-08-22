@@ -79,12 +79,32 @@ function renderResult(result, { skipEvidence = false } = {}) {
   $('#confidence').textContent = `${Math.round(result.confidence * 100)}% confidence`;
   $('#root-cause').textContent = result.rootCause.finding;
   $('#decision').textContent = result.decision;
+  const reasoning = typeof result.reasoning === 'string' && result.reasoning.trim() ? result.reasoning.trim() : '';
+  $('#result-reasoning').hidden = !reasoning;
+  $('#reasoning-text').textContent = reasoning;
   $('#actions').innerHTML = result.actions.map((action) => `<li>${escapeHtml(action)}</li>`).join('');
   $('#agent-result').hidden = false;
   if (!skipEvidence) renderEvidence(result);
 }
 
 const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+let traceStart = 0;
+
+function addTrace(kind, text) {
+  const elapsed = traceStart ? `+${((performance.now() - traceStart) / 1000).toFixed(1)}s` : '';
+  const item = document.createElement('li');
+  item.dataset.kind = kind;
+  item.innerHTML = `<time>${escapeHtml(elapsed)}</time><em>${escapeHtml(kind)}</em><span>${escapeHtml(text)}</span>`;
+  $('#trace-list').appendChild(item);
+  $('#agent-trace').hidden = false;
+}
+
+function resetTrace() {
+  $('#trace-list').innerHTML = '';
+  $('#agent-trace').hidden = false;
+  traceStart = performance.now();
+}
 
 async function runReplay(query, label) {
   // A failed live stream may have left partial tool calls and evidence behind.
@@ -97,6 +117,7 @@ async function runReplay(query, label) {
     'Ranking recovery options…'
   ]) {
     label.textContent = step;
+    addTrace('replay', step);
     await wait(330);
   }
   renderResult(investigateIncident(scenario, query));
@@ -108,12 +129,18 @@ function dispatchStreamEvent(name, data, state) {
       liveEngine = data.engine === 'gemini' ? 'gemini' : 'deterministic';
       setModeIndicator('DETERMINISTIC FALLBACK');
     }
+    addTrace('phase', data.label);
     $('#progress-label').textContent = data.label;
+    return;
+  }
+  if (name === 'thought') {
+    addTrace('thought', data.text);
     return;
   }
   if (name === 'reset') {
     $('#evidence-list').innerHTML = '';
     $('#tool-calls').innerHTML = '';
+    $('#trace-list').innerHTML = '';
     $('#evidence-results').hidden = true;
     $('#evidence-empty').hidden = false;
     return;
@@ -121,6 +148,8 @@ function dispatchStreamEvent(name, data, state) {
   if (name === 'tool_call') {
     showEvidencePanel();
     if (data.replay === false) $('#tool-trace-label').textContent = 'MCP TOOL TRACE · LIVE';
+    const args = Object.entries(data.args ?? {}).map(([key, value]) => `${key}=${value}`).join(' ');
+    addTrace('tool', `${data.tool}${args ? ` (${args})` : ''}`);
     appendToolCall(data);
     return;
   }
@@ -193,6 +222,7 @@ async function runInvestigation(event) {
   $('#evidence-empty').hidden = false;
   progress.hidden = false;
   label.textContent = 'Connecting…';
+  resetTrace();
   await liveModeReady;
 
   try {
