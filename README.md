@@ -47,6 +47,18 @@ Planned runtime:
 Browser → Google ADK/Gemini on Cloud Run → Grafana Cloud MCP (read-only)
 ```
 
+## Repository layout
+
+```text
+web/       incident room UI (static, zero-dependency)
+src/       shared domain logic (investigator core, scenarios)
+server/    Cloud Run agent service (scaffold)
+infra/     deployment & telemetry stack configuration (scaffold)
+eval/      agent evaluation harness (scaffold)
+scripts/   build & validation
+test/      unit tests
+```
+
 ## Grafana MCP
 
 Antigravity config lives at `.agents/mcp_config.json`. First connection needs

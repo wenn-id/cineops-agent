@@ -1,5 +1,5 @@
-import { investigateIncident } from './src/core.mjs';
-import { scenarios } from './src/scenarios.mjs';
+import { investigateIncident } from '../src/core.mjs';
+import { scenarios } from '../src/scenarios.mjs';
 
 const scenario = scenarios['premiere-night'];
 const $ = (selector) => document.querySelector(selector);

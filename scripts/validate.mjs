@@ -1,14 +1,14 @@
 import { access, readFile } from 'node:fs/promises';
 
-const required = ['index.html', 'styles.css', 'app.mjs', 'src/core.mjs', 'src/scenarios.mjs'];
+const required = ['web/index.html', 'web/styles.css', 'web/app.mjs', 'src/core.mjs', 'src/scenarios.mjs'];
 const errors = [];
 
 for (const file of required) {
   try { await access(file); } catch { errors.push(`missing ${file}`); }
 }
 
-const html = await readFile('index.html', 'utf8');
-const css = await readFile('styles.css', 'utf8');
+const html = await readFile('web/index.html', 'utf8');
+const css = await readFile('web/styles.css', 'utf8');
 for (const id of ['pipeline-stages', 'investigation-form', 'agent-result', 'evidence-list', 'result-status']) {
   if (!html.includes(`id="${id}"`)) errors.push(`missing #${id}`);
 }
@@ -20,6 +20,10 @@ if ((cssStructural.match(/{/g) ?? []).length !== (cssStructural.match(/}/g) ?? [
 }
 for (const asset of ['styles.css', 'app.mjs']) {
   if (!html.includes(asset)) errors.push(`unreferenced ${asset}`);
+}
+const appSource = await readFile('web/app.mjs', 'utf8');
+for (const module of ['../src/core.mjs', '../src/scenarios.mjs']) {
+  if (!appSource.includes(`'${module}'`)) errors.push(`web/app.mjs must import '${module}'`);
 }
 
 if (errors.length) {
