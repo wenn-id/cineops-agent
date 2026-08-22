@@ -17,7 +17,7 @@ test('report: faithfully reproduces the investigation', () => {
   assert.match(markdown, /^# CineOps investigation report — INC-042/);
   assert.match(markdown, /Generated.*2026-08-22T20:30:00\.000Z.*replay mode/);
   assert.match(markdown, /\*\*Operator query:\*\* Can we still make the premiere\?/);
-  assert.match(markdown, /Verdict: root_cause_identified · severity \*\*critical\*\*/);
+  assert.match(markdown, /\*\*Verdict:\*\* root_cause_identified · severity \*\*critical\*\*/);
   assert.match(markdown, /## Root cause/);
   assert.match(markdown, /\*\*transcode\*\* — Queue is 7\.8× baseline/);
   assert.match(markdown, /## Recovery decision/);
