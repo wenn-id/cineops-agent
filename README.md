@@ -12,10 +12,20 @@ track of Agentic Cinema: The Blockbuster Hackathon.
 - Zero-dependency Node agent service (`server/`): server-side investigations
   streamed to the browser over SSE, health endpoint, static `dist/` serving,
   and a Dockerfile for Cloud Run.
+- Gemini-powered investigation loop (`server/gemini-agent.mjs`): the model
+  selects read-only observability tools itself across multiple turns, then
+  returns a structured verdict (root cause, confidence, recovery actions) via
+  response schema. Runs with `GEMINI_API_KEY` set; verify wiring with
+  `npm run check:gemini`. Any Gemini failure streams an honest fallback status
+  and continues on the deterministic engine.
 - Deterministic investigation engine that ranks metrics and logs, identifies a
   root cause, and produces a recovery decision.
+- Anti-hallucination assembly: the model can only cite evidence ids returned
+  by the tools; metric values and queries always come from the incident data,
+  never from the model.
 - Read-only Grafana MCP tool trace for `query_prometheus`, `query_loki_logs`,
-  and `search_dashboards`.
+  and `search_dashboards` — tool names match the Grafana MCP contract that the
+  live client (#30) will back with real telemetry.
 - Responsive, accessible, zero-dependency UI with automatic live/replay mode:
   served by the agent service it streams server-side investigations; served
   statically (e.g. GitHub Pages) it falls back to in-browser replay.
@@ -23,11 +33,12 @@ track of Agentic Cinema: The Blockbuster Hackathon.
   operator queries, and the service API (SSE, errors, static safety).
 
 The public Pages demo runs in replay mode so it works without credentials or
-cloud billing; when served by the agent service the same UI runs the
-investigation server-side with a deterministic engine. Gemini reasoning, live
-Grafana telemetry, and Cloud Run deployment remain the next runtime milestone.
-Interface labels replayed data explicitly; it does not present fixture data as
-a live external tool call.
+cloud billing. Served by the agent service, the same UI runs investigations
+server-side: with `GEMINI_API_KEY` set the reasoning is live Gemini over the
+tool loop; without it (or on any API failure) the deterministic engine takes
+over, and the UI names the active engine. Tool data still comes from the
+incident fixture until the live Grafana telemetry lands (#30). Cloud Run
+deployment instructions are in `infra/README.md`.
 
 ## Run locally
 
@@ -45,8 +56,10 @@ Both servers expose only the built `dist/` directory — never the repository,
 ```text
 Incident room (web/)
   ├─ live mode: fetch SSE → agent service (server/)
-  │    └─ investigation engine (src/core.mjs) → streamed events
-  │         future: Gemini loop (#29) + Grafana Cloud MCP (#30)
+  │    ├─ Gemini engine: model-selected tool calls → structured verdict
+  │    │    (server/gemini-agent.mjs; falls back on any failure)
+  │    └─ deterministic engine (src/core.mjs)
+  │    future: live Grafana Cloud MCP telemetry (#30)
   └─ replay mode: deterministic investigator runs in the browser
        (static hosting fallback, e.g. GitHub Pages)
 

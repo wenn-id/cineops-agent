@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { scenarios } from '../src/scenarios.mjs';
 import { investigateStream } from './agent.mjs';
+import { geminiAvailable } from './gemini.mjs';
 import { resolveStatic } from './static.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -85,7 +86,7 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
     try {
       const url = new URL(req.url, 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/api/health') {
-        sendJson(res, 200, { ok: true, engine: 'deterministic', replayAvailable: true });
+        sendJson(res, 200, { ok: true, engine: geminiAvailable() ? 'gemini' : 'deterministic', replayAvailable: true });
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/investigate') {

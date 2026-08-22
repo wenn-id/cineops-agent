@@ -4,6 +4,7 @@ const required = [
   'web/index.html', 'web/styles.css', 'web/app.mjs',
   'src/core.mjs', 'src/scenarios.mjs',
   'server/index.mjs', 'server/agent.mjs', 'server/static.mjs',
+  'server/gemini.mjs', 'server/gemini-agent.mjs',
 ];
 const errors = [];
 
