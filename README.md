@@ -1,114 +1,148 @@
 # CineOps Agent
 
-Production incident investigation for media pipelines. Built for the Grafana
-track of Agentic Cinema: The Blockbuster Hackathon.
+**Find the failure. Save the premiere.**
+
+CineOps Agent investigates media-pipeline incidents in a single pass: it asks the
+observability stack what is wrong, correlates the evidence, and returns a root
+cause with a recovery decision — while the premiere deadline is still on the
+clock.
+
+[![CI](https://github.com/wenn-id/cineops-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/wenn-id/cineops-agent/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![demo](https://img.shields.io/badge/live%20demo-incident%20room-d8ff45)](https://wenn-id.github.io/cineops-agent/)
+[![engine](https://img.shields.io/badge/engine-Gemini%20%C2%B7%20Grafana%20MCP-8c958c)](server/gemini-agent.mjs)
 
 ![CineOps Agent incident room](docs/cineops-agent-demo.png)
 
-## What works now
+Built for the **Grafana track** of [Agentic Cinema: The Blockbuster
+Hackathon](https://agentic-cinema.devpost.com/) (Google Cloud × Devpost) — an
+agentic take on production incident response for media & entertainment
+workflows.
 
-- Interactive incident room for upload, ingest, transcode, subtitles, quality
-  control, and publishing stages.
-- Zero-dependency Node agent service (`server/`): server-side investigations
-  streamed to the browser over SSE, health endpoint, static `dist/` serving,
-  and a Dockerfile for Cloud Run.
-- Gemini-powered investigation loop (`server/gemini-agent.mjs`): the model
-  selects read-only observability tools itself across multiple turns, then
-  returns a structured verdict (root cause, confidence, recovery actions) via
-  response schema. Runs with `GEMINI_API_KEY` set; verify wiring with
-  `npm run check:gemini`. Any Gemini failure streams an honest fallback status
-  and continues on the deterministic engine.
-- Deterministic investigation engine that ranks metrics and logs, identifies a
-  root cause, and produces a recovery decision.
-- Read-only Grafana Cloud MCP client (`server/grafana-mcp.mjs`): streamable
-  HTTP JSON-RPC with initialize/session handling, a hard read-only tool
-  allowlist (`query_prometheus`, `query_loki_logs`, `search_dashboards`), and
-  live tool execution (`server/grafana-live.mjs`) that translates the agent's
-  stage-scoped calls into real PromQL/LogQL queries. Live values overlay the
-  fixture with explicit provenance (`liveValue`), evidence cards link to the
-  matching Grafana dashboard, and the tool ledger switches to
-  `MCP TOOL TRACE · LIVE`. Enabled with `GRAFANA_URL` + `GRAFANA_API_KEY`
-  (plus `GEMINI_API_KEY` for the live engine); any MCP failure falls back to
-  the deterministic engine.
-- Anti-hallucination assembly: the model can only cite evidence ids returned
-  by the tools; metric values and queries always come from the incident data,
-  never from the model.
-- Read-only Grafana MCP tool trace for `query_prometheus`, `query_loki_logs`,
-  and `search_dashboards` — tool names match the Grafana MCP contract that the
-  live client (#30) will back with real telemetry.
-- Live incident telemetry simulator (`simulator/`, issue #31): replays the
-  Neon Harbor incident as real Prometheus metrics and Loki encoder logs on a
-  loop (baseline → failure → recovery). `npm run stack:up` brings up the whole
-  observability stack — Prometheus, Loki, and Grafana with a provisioned
-  dashboard — via `infra/docker-compose.yml`.
-- Responsive, accessible, zero-dependency UI with automatic live/replay mode:
-  served by the agent service it streams server-side investigations; served
-  statically (e.g. GitHub Pages) it falls back to in-browser replay.
-- Node test suite covering evidence ranking, pipeline summaries, validation,
-  operator queries, and the service API (SSE, errors, static safety).
+## Why it matters
 
-The public Pages demo runs in replay mode so it works without credentials or
-cloud billing. Served by the agent service, the same UI runs investigations
-server-side: with `GEMINI_API_KEY` set the reasoning is live Gemini over the
-tool loop; without it (or on any API failure) the deterministic engine takes
-over, and the UI names the active engine. Tool data still comes from the
-incident fixture until the live Grafana telemetry lands (#30). Cloud Run
-deployment instructions are in `infra/README.md`.
+A transcode farm saturating forty minutes before a live premiere is the M&E
+nightmare: an on-call engineer hops between dashboards, greps logs, and
+reconstructs the incident by hand. CineOps runs that investigation as a
+tool-calling agent — the model selects the queries, the evidence lands as it
+arrives, and the operator gets a verdict with cited evidence and a recovery
+plan they can approve.
 
-## Run locally
+## Try it
+
+| Demo | What you get |
+| --- | --- |
+| [Live incident room](https://wenn-id.github.io/cineops-agent/) | Instant investigation in replay mode — no setup, no keys |
+| `npm start` | The agent service: server-side investigation streamed over SSE, with the live agent-trace timeline |
+| `npm run stack:up` | The whole living incident: Prometheus + Loki + Grafana + telemetry simulator via docker compose |
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph UI["Incident room — web/"]
+    Q["Operator question"]
+    T["Agent trace timeline"]
+    E["Evidence + verdict + reasoning"]
+  end
+  subgraph SVC["Agent service — server/ (Cloud Run)"]
+    D["Engine dispatch + fallback"]
+    G["Gemini agent loop<br/>gemini-agent.mjs"]
+    M["Grafana MCP client<br/>grafana-mcp.mjs"]
+    C["Deterministic core<br/>src/core.mjs"]
+  end
+  subgraph OBS["Observability stack — infra/docker-compose.yml"]
+    P["Prometheus"]
+    L["Loki"]
+    F["Grafana"]
+    S["Incident simulator — simulator/"]
+  end
+  Q -- "SSE stream" --> D
+  D --> G
+  D --> C
+  G -- "read-only tool calls" --> M
+  M --> P
+  M --> L
+  M --> F
+  S --> P
+  S --> L
+  G --> T
+  G --> E
+```
+
+## How CineOps uses Gemini, Google Cloud, and Grafana
+
+Every claim below is verifiable in the linked file — no integration is named
+only in a README.
+
+| Capability | Where | What to verify |
+| --- | --- | --- |
+| Gemini agent loop (multi-turn tool calling) | [`server/gemini-agent.mjs`](server/gemini-agent.mjs) | `TOOL_DECLARATIONS`, the `functionCall` → execute → `functionResponse` loop, `responseSchema` verdict, `thought` events |
+| Gemini REST adapter | [`server/gemini.mjs`](server/gemini.mjs) | `generateContent` call with header auth, timeout, `GEMINI_MODEL` env |
+| Grafana MCP client (read-only) | [`server/grafana-mcp.mjs`](server/grafana-mcp.mjs) | MCP streamable HTTP (initialize/session), and the hard allowlist: only `query_prometheus`, `query_loki_logs`, `search_dashboards` |
+| Live telemetry execution | [`server/grafana-live.mjs`](server/grafana-live.mjs) | Per-stage PromQL/LogQL calls, `liveValue` provenance, per-target failure isolation |
+| Evidence grounding (anti-hallucination) | [`server/gemini-agent.mjs`](server/gemini-agent.mjs) | `assembleResult` accepts only signal ids an executed tool returned; fixture values override model numbers |
+| Living incident telemetry | [`simulator/engine.mjs`](simulator/engine.mjs) | Incident arc (baseline → failure → recovery), Prometheus exposition, Loki log push |
+| Google Cloud deployment | [`infra/README.md`](infra/README.md) | Cloud Run service (Dockerfile), Secret Manager setup, deploy commands |
+
+Enable the live engines with `GEMINI_API_KEY` and `GRAFANA_URL` +
+`GRAFANA_API_KEY`; verify a Gemini key in one command:
 
 ```bash
-npm test
-npm start            # build + agent service → http://127.0.0.1:8000 (live mode)
-npm run start:replay # offline alternative: static replay server (python)
+GEMINI_API_KEY=... npm run check:gemini
 ```
 
-Both servers expose only the built `dist/` directory — never the repository,
-`.git/`, or `.agents/`.
+## Quickstart
 
-## Architecture
-
-```text
-Incident room (web/)
-  ├─ live mode: fetch SSE → agent service (server/)
-  │    ├─ Gemini engine: model-selected tool calls → structured verdict
-  │    │    (server/gemini-agent.mjs; falls back on any failure)
-  │    └─ deterministic engine (src/core.mjs)
-  │    future: live Grafana Cloud MCP telemetry (#30)
-  └─ replay mode: deterministic investigator runs in the browser
-       (static hosting fallback, e.g. GitHub Pages)
-
-Target runtime:
-Browser → agent service on Cloud Run → Gemini + Grafana Cloud MCP (read-only)
+```bash
+npm ci
+npm test     # 42 tests, no network needed
+npm start    # build + agent service → http://127.0.0.1:8000
 ```
 
-Deploy instructions for Cloud Run (including secret setup) live in
-[`infra/README.md`](infra/README.md).
+Open <http://127.0.0.1:8000> — the incident room detects the backend and runs
+the investigation server-side. The full observability stack (Prometheus, Loki,
+Grafana with the provisioned Neon Harbor dashboard, incident simulator):
+
+```bash
+npm run stack:up     # Grafana at http://localhost:3000 (admin / cineops)
+```
+
+Deploying to Cloud Run is three commands — see [`infra/README.md`](infra/README.md).
+
+## Engines, and honesty about what is live
+
+The UI always names the engine that produced an investigation.
+
+- **Public Pages demo** → replay mode: the deterministic investigator runs in
+  the browser against the incident fixture, labeled `LOCAL REPLAY`.
+- **Agent service without keys** → the deterministic engine runs server-side,
+  labeled `SERVER AGENT · DETERMINISTIC CORE`.
+- **With `GEMINI_API_KEY`** → live Gemini reasoning over the tool loop. Tool
+  data still comes from the incident fixture unless MCP is configured.
+- **With `GRAFANA_URL` + `GRAFANA_API_KEY`** → tool calls hit Grafana MCP for
+  real; live values override the fixture with `liveValue` provenance, and
+  evidence links to the matching dashboard.
+- **Any engine failure** → an honest `fallback` status event resets the UI and
+  the deterministic engine completes the investigation. Replayed tool data is
+  always labeled `replay` — fixture data is never presented as a live call.
 
 ## Repository layout
 
 ```text
 web/       incident room UI (static, zero-dependency)
 src/       shared domain logic (investigator core, scenarios)
-server/    Cloud Run agent service (scaffold)
-infra/     deployment & telemetry stack configuration (scaffold)
+server/    Cloud Run agent service (orchestrator, Gemini loop, Grafana MCP)
+simulator/ live incident telemetry (Prometheus metrics, Loki logs)
+infra/     telemetry stack + Cloud Run deployment
 eval/      agent evaluation harness (scaffold)
 scripts/   build & validation
-test/      unit tests
+test/      unit + integration tests
 ```
-
-## Grafana MCP
-
-Antigravity config lives at `.agents/mcp_config.json`. First connection needs
-Grafana OAuth authorization. No Grafana credential is stored in this repo.
-
-A real read-only connectivity test already completed in Antigravity using the
-Grafana tools `list_datasources` and `search_dashboards`. Production runtime
-integration will reuse the same OAuth-based Cloud MCP path.
 
 ## Project
 
-- Live local-replay demo: <https://wenn-id.github.io/cineops-agent/>
+- Live incident room (Pages, replay mode): <https://wenn-id.github.io/cineops-agent/>
 - Repository: <https://github.com/wenn-id/cineops-agent>
 - Google Cloud project: `cineops-agentic-cinema-2026`
 - License: MIT
