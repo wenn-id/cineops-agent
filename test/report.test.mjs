@@ -47,3 +47,16 @@ test('report: minimal results do not crash the builder', () => {
   assert.match(markdown, /INC-X/);
   assert.match(markdown, /\*\*Verdict:\*\* unknown · severity \*\*unknown\*\* · confidence \*\*0%\*\*/);
 });
+
+test('report: Loki queries with pipes do not break the evidence table', () => {
+  const withLoki = {
+    ...result,
+    evidence: [{ id: 'error-rate', stage: 'transcode', source: 'Loki', label: 'Encoder timeout rate', value: 37.4, unit: '%', query: '{service="transcoder"} |= "deadline exceeded"' }],
+  };
+  const markdown = buildReportMarkdown(withLoki, {});
+  const tableRow = markdown.split('\n').find((line) => line.includes('Encoder timeout rate'));
+  assert.ok(tableRow, 'evidence row exists');
+  const cells = tableRow.split(/(?<!\\)\|/).filter((cell) => cell.trim() !== '');
+  assert.equal(cells.length, 6, 'the row must keep exactly six columns');
+  assert.match(tableRow, /\\\|=.*deadline exceeded/);
+});

@@ -1,6 +1,9 @@
 // Markdown report builder for a completed investigation. Pure and shared by
 // the browser (one-click export) and testable on the server side.
 
+// Markdown table cells must escape pipes — Loki queries contain `|=`.
+const escapeCell = (value) => String(value ?? '').replace(/\|/g, '\\|');
+
 export function buildReportMarkdown(result, { trace = [], mode = 'live', generatedAt = new Date().toISOString() } = {}) {
   if (!result || typeof result !== 'object') throw new TypeError('result is required');
   const lines = [];
@@ -40,8 +43,8 @@ export function buildReportMarkdown(result, { trace = [], mode = 'live', generat
     lines.push('| --- | --- | --- | --- | --- | --- |');
     result.evidence.forEach((item, index) => {
       const value = `${item.value}${item.unit === '%' ? '%' : ` ${item.unit ?? ''}`}`.trim();
-      const query = item.url ? `[${item.query}](${item.url})` : item.query ?? '';
-      lines.push(`| ${index + 1} | ${item.label ?? item.id} | ${item.stage ?? ''} | ${item.source ?? ''} | ${value} | ${query} |`);
+      const query = item.url ? `[${escapeCell(item.query)}](${item.url})` : escapeCell(item.query);
+      lines.push(`| ${index + 1} | ${escapeCell(item.label ?? item.id)} | ${escapeCell(item.stage)} | ${escapeCell(item.source)} | ${escapeCell(value)} | ${query} |`);
     });
     lines.push('');
   }

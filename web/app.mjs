@@ -176,6 +176,7 @@ function dispatchStreamEvent(name, data, state) {
     $('#evidence-list').innerHTML = '';
     $('#tool-calls').innerHTML = '';
     $('#trace-list').innerHTML = '';
+    traceLog.length = 0;
     $('#evidence-results').hidden = true;
     $('#evidence-empty').hidden = false;
     return;
