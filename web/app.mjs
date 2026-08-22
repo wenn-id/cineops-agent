@@ -79,6 +79,9 @@ function renderResult(result, { skipEvidence = false } = {}) {
 const wait = (milliseconds) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 
 async function runReplay(query, label) {
+  // A failed live stream may have left partial tool calls and evidence behind.
+  $('#evidence-list').innerHTML = '';
+  $('#tool-calls').innerHTML = '';
   for (const step of [
     'Loading replayed Grafana capture…',
     'Replaying pipeline metrics…',
