@@ -170,6 +170,7 @@ async function runInvestigation(event) {
   $('#evidence-empty').hidden = false;
   progress.hidden = false;
   label.textContent = 'Connecting…';
+  await liveModeReady;
 
   try {
     if (liveMode) await streamInvestigation(query);
@@ -208,10 +209,11 @@ function startCountdown() {
   }, 1000);
 }
 
+const liveModeReady = detectLiveMode();
+
 renderPipeline();
 setModeIndicator();
 startCountdown();
-detectLiveMode();
 $('#investigation-form').addEventListener('submit', runInvestigation);
 if (new URLSearchParams(window.location.search).has('autorun')) {
   $('#investigation-form').requestSubmit();

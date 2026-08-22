@@ -100,6 +100,21 @@ test('server: investigate rejects unknown scenarios and malformed bodies', async
     });
     assert.equal(badJson.status, 400);
 
+    const emptyQuery = await fetch(`http://127.0.0.1:${port}/api/investigate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ scenarioId: 'premiere-night', query: '   ' }),
+    });
+    assert.equal(emptyQuery.status, 400);
+    assert.equal((await emptyQuery.json()).error, 'query is required');
+
+    const missingQuery = await fetch(`http://127.0.0.1:${port}/api/investigate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ scenarioId: 'premiere-night' }),
+    });
+    assert.equal(missingQuery.status, 400);
+
     const method = await fetch(`http://127.0.0.1:${port}/api/health`, { method: 'DELETE' });
     assert.equal(method.status, 405);
   } finally {

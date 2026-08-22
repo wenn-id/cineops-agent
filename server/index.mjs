@@ -53,7 +53,11 @@ async function handleInvestigate(req, res) {
     sendJson(res, 404, { error: `unknown scenario: ${String(payload?.scenarioId)}` });
     return;
   }
-  const query = typeof payload?.query === 'string' ? payload.query : '';
+  if (typeof payload?.query !== 'string' || !payload.query.trim()) {
+    sendJson(res, 400, { error: 'query is required' });
+    return;
+  }
+  const query = payload.query;
 
   res.writeHead(200, {
     'content-type': 'text/event-stream; charset=utf-8',
@@ -61,13 +65,17 @@ async function handleInvestigate(req, res) {
     connection: 'keep-alive',
     'x-accel-buffering': 'no',
   });
-  res.on('close', () => { req.destroy(); });
+  const abort = new AbortController();
+  res.on('close', () => abort.abort());
   try {
-    for await (const message of investigateStream(scenario, query)) {
+    for await (const message of investigateStream(scenario, query, { signal: abort.signal })) {
+      if (abort.signal.aborted || res.destroyed) break;
       res.write(`event: ${message.event}\ndata: ${JSON.stringify(message.data)}\n\n`);
     }
   } catch (error) {
-    res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);
+    if (!abort.signal.aborted && !res.destroyed) {
+      res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);
+    }
   }
   res.end();
 }
