@@ -43,7 +43,7 @@ test('server: health reports deterministic engine', async () => {
     assert.equal(response.status, 200);
     const health = await response.json();
     assert.equal(health.ok, true);
-    assert.equal(health.engine, 'deterministic');
+    assert.ok(['deterministic', 'gemini'].includes(health.engine), `unexpected engine: ${health.engine}`);
   } finally {
     await new Promise((done) => server.close(done));
   }
