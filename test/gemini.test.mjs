@@ -101,7 +101,7 @@ test('gemini loop: function responses carry the executed tool data back to the m
   assert.deepEqual(returned, ['queue-depth', 'gpu-utilization']);
 });
 
-test('investigateStream: gemini failures fall back to the deterministic engine', async () => {
+test('investigateStream: gemini failures reset output and fall back to the deterministic engine', async () => {
   const events = await collect(investigateStream(scenario, 'query', {
     engine: 'gemini',
     callModel: async () => {
@@ -109,13 +109,41 @@ test('investigateStream: gemini failures fall back to the deterministic engine',
     },
   }));
 
+  const resetIndex = events.findIndex((item) => item.event === 'reset');
   const fallback = events.find((item) => item.event === 'status' && item.data.phase === 'fallback');
+  assert.ok(resetIndex !== -1, 'expected a reset event');
   assert.ok(fallback, 'expected a fallback status event');
   assert.match(fallback.data.label, /quota exceeded/);
+  assert.ok(resetIndex < events.findIndex((item) => item.event === 'result'), 'reset must precede the deterministic result');
 
   const result = events.find((item) => item.event === 'result').data;
   assert.equal(result.status, 'root_cause_identified');
   assert.deepEqual(result.toolCalls.map((call) => call.tool), ['query_prometheus', 'query_loki_logs', 'search_dashboards']);
+});
+
+test('gemini loop: parallel tool calls return as one grouped function-response content', async () => {
+  const turns = [
+    modelReply([
+      { functionCall: { name: 'query_prometheus', args: {} } },
+      { functionCall: { name: 'query_loki_logs', args: {} } },
+    ]),
+    finalVerdict(),
+  ];
+  let lastContents;
+  const events = await collect(geminiInvestigation({
+    scenario,
+    query: 'q',
+    callModel: async (request) => {
+      lastContents = request.contents;
+      return turns.shift();
+    },
+  }));
+
+  const last = lastContents[lastContents.length - 1];
+  assert.equal(last.role, 'user');
+  const responses = last.parts.filter((part) => part.functionResponse);
+  assert.deepEqual(responses.map((part) => part.functionResponse.name), ['query_prometheus', 'query_loki_logs']);
+  assert.equal(events.filter((item) => item.event === 'tool_call').length, 2);
 });
 
 test('investigateStream: auto without a key stays deterministic', async () => {

@@ -100,7 +100,18 @@ async function runReplay(query, label) {
 
 function dispatchStreamEvent(name, data, state) {
   if (name === 'status') {
+    if (data.phase === 'fallback' && data.engine) {
+      liveEngine = data.engine === 'gemini' ? 'gemini' : 'deterministic';
+      setModeIndicator('DETERMINISTIC FALLBACK');
+    }
     $('#progress-label').textContent = data.label;
+    return;
+  }
+  if (name === 'reset') {
+    $('#evidence-list').innerHTML = '';
+    $('#tool-calls').innerHTML = '';
+    $('#evidence-results').hidden = true;
+    $('#evidence-empty').hidden = false;
     return;
   }
   if (name === 'tool_call') {

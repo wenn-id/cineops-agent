@@ -179,6 +179,9 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
 
     if (functionCalls.length) {
       contents.push({ role: 'model', parts });
+      // Parallel calls in one model turn must come back as a single content
+      // holding every functionResponse, per the Gemini contract.
+      const responses = [];
       for (const call of functionCalls) {
         const toolResult = executeTool(scenario, call.name, call.args);
         executed.push({ name: call.name, args: call.args ?? {} });
@@ -186,8 +189,9 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
           event: 'tool_call',
           data: { tool: call.name, args: call.args ?? {}, server: 'grafana', readOnly: true, replay: true },
         };
-        contents.push({ role: 'user', parts: [{ functionResponse: { name: call.name, response: toolResult } }] });
+        responses.push({ functionResponse: { name: call.name, response: toolResult } });
       }
+      contents.push({ role: 'user', parts: responses });
       continue;
     }
 

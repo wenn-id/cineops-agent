@@ -65,6 +65,9 @@ export async function* investigateStream(scenario, query, { signal, engine = 'au
       return;
     } catch (error) {
       if (signal?.aborted) throw error;
+      // Partial Gemini output may already be on the client: tell it to reset
+      // the evidence and tool ledger before the deterministic engine replays.
+      yield { event: 'reset', data: { engine: 'deterministic' } };
       yield {
         event: 'status',
         data: { phase: 'fallback', engine: 'deterministic', label: `Gemini unavailable (${error.message}) — switching to the deterministic engine…` },

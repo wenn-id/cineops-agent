@@ -9,20 +9,24 @@ export function geminiAvailable() {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
-// request: { model?, systemInstruction, contents, tools?, generationConfig? }
+// request: { model?, systemInstruction?, contents, tools?, generationConfig? }
 // Returns the parsed generateContent response. Throws on HTTP errors.
 export async function callGemini(request, { apiKey = process.env.GEMINI_API_KEY, signal } = {}) {
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
+  // The timeout must hold even when the caller passes its own signal, so a
+  // connected client can never leave a stalled upstream request hanging.
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const composedSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
   const response = await fetch(`${API_BASE}/${request.model ?? DEFAULT_MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: request.systemInstruction }] },
+      ...(request.systemInstruction ? { systemInstruction: { parts: [{ text: request.systemInstruction }] } } : {}),
       contents: request.contents,
       ...(request.tools?.length ? { tools: [{ functionDeclarations: request.tools }] } : {}),
       generationConfig: request.generationConfig,
     }),
-    signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: composedSignal,
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
