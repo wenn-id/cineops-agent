@@ -27,9 +27,18 @@ server-side and streams over SSE).
 | --- | --- | --- |
 | `PORT` | Listen port (set by Cloud Run) | `8000` |
 | `HOST` | Bind address (image sets `0.0.0.0` for containers) | `127.0.0.1` |
-| `STREAM_DELAY_MS` | Artificial per-event delay for demo pacing | `0` |
-| `GEMINI_API_KEY` | Gemini adapter (issue #29) — store in Secret Manager | unset |
+| `STREAM_DELAY_MS` | Artificial per-event delay for demo pacing (deterministic engine) | `0` |
+| `GEMINI_API_KEY` | Enables the Gemini investigation engine (issue #29) — store in Secret Manager | unset |
+| `GEMINI_MODEL` | Gemini model for the agent loop | `gemini-2.5-flash` |
 | `GRAFANA_URL` | Grafana Cloud MCP target (issue #30) | unset |
+
+With `GEMINI_API_KEY` unset the service runs the deterministic engine and
+reports `"engine":"deterministic"` at `/api/health`; with the key set it runs
+the Gemini tool loop and reports `"engine":"gemini"`. Verify a key locally:
+
+```bash
+GEMINI_API_KEY=... npm run check:gemini
+```
 
 ## Secrets (for #29 / #30)
 

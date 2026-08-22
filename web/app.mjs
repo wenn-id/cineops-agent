@@ -6,10 +6,13 @@ const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 
 let liveMode = false;
+let liveEngine = 'deterministic';
 
 function setModeIndicator(text) {
   $('#system-state').innerHTML = `<i></i> ${escapeHtml(text ?? (liveMode ? 'LIVE SERVICE' : 'LOCAL REPLAY'))}`;
-  $('#engine-chip').textContent = liveMode ? 'SERVER AGENT · DETERMINISTIC CORE' : 'LOCAL MVP · GEMINI ADAPTER NEXT';
+  $('#engine-chip').textContent = liveMode
+    ? (liveEngine === 'gemini' ? 'SERVER AGENT · GEMINI' : 'SERVER AGENT · DETERMINISTIC CORE')
+    : 'LOCAL MVP · GEMINI ADAPTER NEXT';
 }
 
 async function detectLiveMode() {
@@ -19,6 +22,7 @@ async function detectLiveMode() {
     const health = await response.json();
     if (health?.ok) {
       liveMode = true;
+      liveEngine = health.engine === 'gemini' ? 'gemini' : 'deterministic';
       setModeIndicator();
     }
   } catch {
