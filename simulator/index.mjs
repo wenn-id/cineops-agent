@@ -70,10 +70,13 @@ function createSimulatorServer() {
       return;
     }
     if (req.method === 'POST' && req.url === '/recover') {
-      // Human-approved recovery only: jump the arc into its descending phase.
+      // Human-approved recovery only: jump the arc into its descending phase
+      // when the incident is still running, and always report the phase the
+      // arc is actually in — an already-resolved incident stays resolved.
       const windowTicks = Math.ceil(scenario.replayWindowSec / TICK_SECONDS);
       tick = Math.max(tick, windowTicks);
-      send(200, { ok: true, phase: 'recovery' });
+      const { phase } = state();
+      send(200, { ok: true, phase });
       return;
     }
     send(404, 'Not found', 'text/plain; charset=utf-8');

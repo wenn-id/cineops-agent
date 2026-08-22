@@ -46,6 +46,7 @@ test('server: health reports deterministic engine', async () => {
     assert.equal(health.ok, true);
     assert.ok(['deterministic', 'gemini'].includes(health.engine), `unexpected engine: ${health.engine}`);
     assert.equal(typeof health.mcp, 'boolean');
+    assert.equal(typeof health.simulator, 'boolean');
   } finally {
     await new Promise((done) => server.close(done));
   }
@@ -125,7 +126,7 @@ test('server: investigate rejects unknown scenarios and malformed bodies', async
   }
 });
 
-test('server: recovery requires approval and the simulator', async () => {
+test('server: recovery requires approval, a referenced investigation, and the simulator', async () => {
   const { server, port } = await startServer({ port: 0 });
   const base = `http://127.0.0.1:${port}`;
   const hadSimulator = process.env.SIMULATOR_URL;
@@ -139,20 +140,39 @@ test('server: recovery requires approval and the simulator', async () => {
     assert.equal(notApproved.status, 400);
     assert.match((await notApproved.json()).error, /explicit approval/);
 
-    const noSimulator = await fetch(`${base}/api/recovery`, {
+    const crossOrigin = await fetch(`${base}/api/recovery`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'https://evil.example' },
+      body: JSON.stringify({ approved: true }),
+    });
+    assert.equal(crossOrigin.status, 403);
+
+    const noRef = await fetch(`${base}/api/recovery`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ approved: true }),
     });
-    assert.equal(noSimulator.status, 503);
+    assert.equal(noRef.status, 404);
+    assert.match((await noRef.json()).error, /reference the investigation/);
 
-    const noState = await fetch(`${base}/api/incident-state`);
-    assert.equal(noState.status, 503);
+    const stateUnavailable = await fetch(`${base}/api/incident-state`);
+    assert.equal(stateUnavailable.status, 503);
   } finally {
     if (hadSimulator !== undefined) process.env.SIMULATOR_URL = hadSimulator;
     await new Promise((done) => server.close(done));
   }
 });
+
+async function runInvestigationForRef(base) {
+  const response = await fetch(`${base}/api/investigate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ scenarioId: 'premiere-night', query: 'ref please' }),
+  });
+  const raw = await response.text();
+  const resultLine = raw.split('\n').find((line) => line.startsWith('data:') && line.includes('"investigationRef"'));
+  return JSON.parse(resultLine.slice(5)).investigationRef;
+}
 
 test('server: approved recovery drives the live simulator', async () => {
   const simulator = await startSimulator({ port: 0, host: '127.0.0.1' });
@@ -162,17 +182,21 @@ test('server: approved recovery drives the live simulator', async () => {
   try {
     const before = await (await fetch(`${base}/api/incident-state`)).json();
     assert.ok(Array.isArray(before.stages));
+    assert.ok(before.stages.every((stage) => typeof stage.detail === 'string' && stage.detail.length > 0));
     assert.equal(before.scenarioId, 'premiere-night');
+
+    const investigationRef = await runInvestigationForRef(base);
+    assert.match(investigationRef, /^[0-9a-f-]{36}$/);
 
     const approval = await fetch(`${base}/api/recovery`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ approved: true }),
+      body: JSON.stringify({ approved: true, investigationRef }),
     });
     assert.equal(approval.status, 200);
     const payload = await approval.json();
     assert.equal(payload.acknowledged, true);
-    assert.equal(payload.phase, 'recovery');
+    assert.ok(['incident', 'recovery', 'complete'].includes(payload.phase), `honest phase expected, got ${payload.phase}`);
   } finally {
     delete process.env.SIMULATOR_URL;
     await new Promise((done) => server.close(done));

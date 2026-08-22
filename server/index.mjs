@@ -112,7 +112,8 @@ export function simulatorAvailable() {
 }
 
 async function callSimulator(path, init) {
-  const response = await fetch(`${process.env.SIMULATOR_URL}${path}`, {
+  const base = (process.env.SIMULATOR_URL ?? '').replace(/\/+$/, '');
+  const response = await fetch(`${base}${path}`, {
     ...init,
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
     signal: AbortSignal.timeout(5_000),
@@ -130,6 +131,7 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
           ok: true,
           engine: geminiAvailable() ? 'gemini' : 'deterministic',
           mcp: mcpAvailable(),
+          simulator: simulatorAvailable(),
           replayAvailable: true,
         });
         return;
@@ -185,8 +187,30 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
           sendJson(res, 400, { error: 'invalid JSON body' });
           return;
         }
+        // Browser-originated approvals must come from this service (basic
+        // CSRF guard); operator authentication is documented as out of scope
+        // for the single-user demo deployment.
+        const origin = req.headers.origin;
+        if (origin) {
+          try {
+            if (new URL(origin).host !== req.headers.host) {
+              sendJson(res, 403, { error: 'cross-origin recovery requests are rejected' });
+              return;
+            }
+          } catch {
+            sendJson(res, 403, { error: 'invalid origin header' });
+            return;
+          }
+        }
         if (payload?.approved !== true) {
           sendJson(res, 400, { error: 'recovery requires explicit approval' });
+          return;
+        }
+        // The approval must reference the investigation whose plan is being
+        // approved, so an anonymous flag flip alone cannot act.
+        const stored = typeof payload?.investigationRef === 'string' ? investigations.get(payload.investigationRef) : undefined;
+        if (!stored) {
+          sendJson(res, 404, { error: 'unknown investigation — approval must reference the investigation being approved' });
           return;
         }
         if (!simulatorAvailable()) {

@@ -91,7 +91,7 @@ export function stageStatuses(scenario, fraction) {
     if (stage.id === 'transcode') status = transcodeFailed ? 'failed' : transcodeDegraded ? 'degraded' : 'healthy';
     else if (stage.id === 'subtitles') status = subtitleDegraded ? 'degraded' : 'healthy';
     else if (stage.id === 'quality-control') status = transcodeFailed || transcodeDegraded ? 'waiting' : 'healthy';
-    return { id: stage.id, label: stage.label, status };
+    return { id: stage.id, label: stage.label, status, detail: stage.detail };
   });
 }
 

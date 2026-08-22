@@ -7,6 +7,7 @@ const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => (
 
 let liveMode = false;
 let liveEngine = 'deterministic';
+let liveSimulator = false;
 let lastResult = null;
 let followupGeneration = 0;
 const followupHistory = [];
@@ -26,6 +27,7 @@ async function detectLiveMode() {
     if (health?.ok) {
       liveMode = true;
       liveEngine = health.engine === 'gemini' ? 'gemini' : 'deterministic';
+      liveSimulator = health.simulator === true;
       setModeIndicator();
     }
   } catch {
@@ -271,8 +273,10 @@ function stopRecoveryPolling() {
 
 function showRecoveryPanel() {
   stopRecoveryPolling();
-  $('#recovery').hidden = !liveMode;
-  if (!liveMode) return;
+  // Recovery is a live drill: without the simulator there is nothing to
+  // execute, and the panel must not offer an action that can only 503.
+  $('#recovery').hidden = !(liveMode && liveSimulator);
+  if (!(liveMode && liveSimulator)) return;
   $('#recovery-title').textContent = 'RECOVERY PLAN · NEEDS YOUR APPROVAL';
   $('#recovery-status').textContent = 'Approve the agent\u2019s plan to execute it against the live pipeline, or reject to escalate to a human operator.';
   $('#approve-recovery').disabled = false;
@@ -296,7 +300,7 @@ async function requestRecovery(approved) {
     const response = await fetch('/api/recovery', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ approved: true }),
+      body: JSON.stringify({ approved: true, investigationRef: lastResult?.investigationRef }),
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload?.error ?? `service unavailable (${response.status})`);
