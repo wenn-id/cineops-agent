@@ -20,7 +20,8 @@ in the incident room.
 Built for the **Grafana track** of [Agentic Cinema: The Blockbuster
 Hackathon](https://agentic-cinema.devpost.com/) (Google Cloud × Devpost) — an
 agentic take on production incident response for media & entertainment
-workflows.
+workflows. Judges: the [3-minute verification guide](docs/JUDGE_GUIDE.md)
+shows where every claim lives.
 
 ## Why it matters
 
