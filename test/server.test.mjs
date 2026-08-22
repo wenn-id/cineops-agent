@@ -44,6 +44,7 @@ test('server: health reports deterministic engine', async () => {
     const health = await response.json();
     assert.equal(health.ok, true);
     assert.ok(['deterministic', 'gemini'].includes(health.engine), `unexpected engine: ${health.engine}`);
+    assert.equal(typeof health.mcp, 'boolean');
   } finally {
     await new Promise((done) => server.close(done));
   }

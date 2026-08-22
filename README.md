@@ -20,6 +20,16 @@ track of Agentic Cinema: The Blockbuster Hackathon.
   and continues on the deterministic engine.
 - Deterministic investigation engine that ranks metrics and logs, identifies a
   root cause, and produces a recovery decision.
+- Read-only Grafana Cloud MCP client (`server/grafana-mcp.mjs`): streamable
+  HTTP JSON-RPC with initialize/session handling, a hard read-only tool
+  allowlist (`query_prometheus`, `query_loki_logs`, `search_dashboards`), and
+  live tool execution (`server/grafana-live.mjs`) that translates the agent's
+  stage-scoped calls into real PromQL/LogQL queries. Live values overlay the
+  fixture with explicit provenance (`liveValue`), evidence cards link to the
+  matching Grafana dashboard, and the tool ledger switches to
+  `MCP TOOL TRACE · LIVE`. Enabled with `GRAFANA_URL` + `GRAFANA_API_KEY`
+  (plus `GEMINI_API_KEY` for the live engine); any MCP failure falls back to
+  the deterministic engine.
 - Anti-hallucination assembly: the model can only cite evidence ids returned
   by the tools; metric values and queries always come from the incident data,
   never from the model.

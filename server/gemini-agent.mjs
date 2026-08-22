@@ -1,5 +1,6 @@
 import { summarizePipeline } from '../src/core.mjs';
 import { callGemini, DEFAULT_MODEL } from './gemini.mjs';
+import { attachDashboardUrls, createLiveToolExecutor } from './grafana-live.mjs';
 
 const MAX_TOOL_TURNS = 8;
 
@@ -107,9 +108,11 @@ function extractJson(text) {
 // The model may only cite evidence that the executed tools actually returned:
 // fixture values override anything the model produced, so numbers can never be
 // invented, and ids outside the tool-grounded set are rejected even when they
-// exist in the scenario, so unqueried signals cannot pass as evidence.
-function assembleResult(scenario, query, parsed, executedToolCalls, groundedIds = new Set()) {
-  const signalsById = new Map(scenario.signals.map((signal) => [signal.id, signal]));
+// exist in the scenario. Live MCP signals (when configured) overlay the fixture
+// registry and keep their live values and provenance flags.
+function assembleResult(scenario, query, parsed, executedToolCalls, liveRegistry = new Map(), liveDashboards = [], groundedIds = new Set()) {
+  const fixtureById = new Map(scenario.signals.map((signal) => [signal.id, signal]));
+  const signalsById = new Map([...fixtureById, ...liveRegistry]);
   const evidence = [];
   const seen = new Set();
   for (const item of Array.isArray(parsed.evidence) ? parsed.evidence : []) {
@@ -121,7 +124,7 @@ function assembleResult(scenario, query, parsed, executedToolCalls, groundedIds 
   }
   const numberOrZero = (value) => (typeof value === 'number' && Number.isFinite(value) ? Math.min(0.99, Math.max(0, value)) : 0);
   const declaredPurpose = new Map(scenario.toolCalls.map((call) => [call.tool, call.purpose]));
-  return {
+  const assembled = {
     engine: 'gemini',
     model: DEFAULT_MODEL,
     incidentId: scenario.id,
@@ -137,12 +140,12 @@ function assembleResult(scenario, query, parsed, executedToolCalls, groundedIds 
     },
     evidence,
     pipeline: summarizePipeline(scenario.stages),
-    toolCalls: executedToolCalls.map(({ name, args }) => ({
+    toolCalls: executedToolCalls.map(({ name, args, live }) => ({
       tool: name,
       purpose: declaredPurpose.get(name) ?? `Inspect ${args?.stage ?? 'pipeline'}`,
       server: 'grafana',
       readOnly: true,
-      replay: true,
+      replay: !live,
     })),
     decision: typeof parsed.decision === 'string' && parsed.decision.trim() ? parsed.decision : 'Escalate to human operator.',
     actions: Array.isArray(parsed.actions) && parsed.actions.length
@@ -150,12 +153,13 @@ function assembleResult(scenario, query, parsed, executedToolCalls, groundedIds 
       : ['Escalate to human operator.'],
     ...(typeof parsed.reasoning === 'string' && parsed.reasoning.trim() ? { reasoning: parsed.reasoning } : {}),
   };
+  return { ...assembled, evidence: attachDashboardUrls(assembled.evidence, liveDashboards) };
 }
 
 // Multi-turn investigation loop: Gemini selects tools, we execute them against
 // the incident data, until the model returns a structured verdict. The callModel
 // injection point keeps the loop fully testable without network access.
-export async function* geminiInvestigation({ scenario, query, signal, model, callModel = callGemini, maxToolTurns = MAX_TOOL_TURNS }) {
+export async function* geminiInvestigation({ scenario, query, signal, model, callModel = callGemini, mcp, maxToolTurns = MAX_TOOL_TURNS }) {
   yield { event: 'status', data: { phase: 'planning', engine: 'gemini', label: `Gemini (${model ?? DEFAULT_MODEL}) planning investigation…` } };
 
   const stageSummary = scenario.stages.map((stage) => `${stage.id}=${stage.status}`).join(', ');
@@ -168,6 +172,9 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
 
   const executed = [];
   const groundedIds = new Set();
+  const liveExecutor = mcp ? createLiveToolExecutor({ scenario, mcp }) : null;
+  const liveRegistry = new Map();
+  const liveDashboards = [];
   for (let turn = 0; turn <= maxToolTurns; turn++) {
     const response = await callModel({
       model,
@@ -186,12 +193,22 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
       // holding every functionResponse, per the Gemini contract.
       const responses = [];
       for (const call of functionCalls) {
-        const toolResult = executeTool(scenario, call.name, call.args);
-        for (const signal of toolResult.signals ?? []) groundedIds.add(signal.id);
-        executed.push({ name: call.name, args: call.args ?? {} });
+        let toolResult;
+        if (liveExecutor) {
+          toolResult = await liveExecutor(call.name, call.args);
+          for (const signal of toolResult.signals ?? []) {
+            liveRegistry.set(signal.id, signal);
+            groundedIds.add(signal.id);
+          }
+          for (const dashboard of toolResult.dashboards ?? []) liveDashboards.push(dashboard);
+        } else {
+          toolResult = executeTool(scenario, call.name, call.args);
+          for (const signal of toolResult.signals ?? []) groundedIds.add(signal.id);
+        }
+        executed.push({ name: call.name, args: call.args ?? {}, live: Boolean(liveExecutor) });
         yield {
           event: 'tool_call',
-          data: { tool: call.name, args: call.args ?? {}, server: 'grafana', readOnly: true, replay: true },
+          data: { tool: call.name, args: call.args ?? {}, server: 'grafana', readOnly: true, replay: !liveExecutor },
         };
         responses.push({ functionResponse: { name: call.name, response: toolResult } });
       }
@@ -201,7 +218,7 @@ export async function* geminiInvestigation({ scenario, query, signal, model, cal
 
     const parsed = extractJson(parts.map((part) => part.text ?? '').join(''));
     yield { event: 'status', data: { phase: 'concluding', engine: 'gemini', label: 'Correlating evidence into a verdict…' } };
-    const result = assembleResult(scenario, query, parsed, executed, groundedIds);
+    const result = assembleResult(scenario, query, parsed, executed, liveRegistry, liveDashboards, groundedIds);
     for (const item of result.evidence) {
       yield { event: 'observation', data: item };
     }

@@ -5,6 +5,7 @@ const required = [
   'src/core.mjs', 'src/scenarios.mjs',
   'server/index.mjs', 'server/agent.mjs', 'server/static.mjs',
   'server/gemini.mjs', 'server/gemini-agent.mjs',
+  'server/grafana-mcp.mjs', 'server/grafana-live.mjs',
 ];
 const errors = [];
 

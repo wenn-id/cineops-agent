@@ -57,11 +57,11 @@ export async function* deterministicInvestigation(scenario, query, { signal } = 
 // Engine dispatch: 'auto' picks Gemini when a key is configured and falls back
 // to the deterministic engine on any Gemini failure, streaming an honest
 // status event about the switch. The callModel injection point is for tests.
-export async function* investigateStream(scenario, query, { signal, engine = 'auto', callModel } = {}) {
+export async function* investigateStream(scenario, query, { signal, engine = 'auto', callModel, mcp } = {}) {
   const wantsGemini = engine === 'gemini' || (engine === 'auto' && geminiAvailable());
   if (wantsGemini) {
     try {
-      yield* geminiInvestigation({ scenario, query, signal, ...(callModel ? { callModel } : {}) });
+      yield* geminiInvestigation({ scenario, query, signal, ...(callModel ? { callModel } : {}), ...(mcp ? { mcp } : {}) });
       return;
     } catch (error) {
       if (signal?.aborted) throw error;

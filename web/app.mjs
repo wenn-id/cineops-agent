@@ -42,12 +42,16 @@ function renderPipeline() {
 }
 
 function evidenceCard(item) {
+  const query = `<code>${escapeHtml(item.query)}</code>`;
+  const linkedQuery = item.url
+    ? `<a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" title="Open in Grafana">${query}</a>`
+    : query;
   return `
-    <article class="evidence-card">
+    <article class="evidence-card"${item.liveValue ? ' data-live-value="true"' : ''}>
       <header><span>${escapeHtml(item.source)} · ${escapeHtml(item.stage)}</span><strong>${escapeHtml(item.value)}${item.unit === '%' ? '%' : ` ${escapeHtml(item.unit)}`}</strong></header>
       <h3>${escapeHtml(item.label)}</h3>
       <p>${escapeHtml(item.finding)}</p>
-      <code>${escapeHtml(item.query)}</code>
+      ${linkedQuery}
     </article>
   `;
 }
@@ -116,6 +120,7 @@ function dispatchStreamEvent(name, data, state) {
   }
   if (name === 'tool_call') {
     showEvidencePanel();
+    if (data.replay === false) $('#tool-trace-label').textContent = 'MCP TOOL TRACE · LIVE';
     appendToolCall(data);
     return;
   }

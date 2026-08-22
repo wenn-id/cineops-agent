@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scenarios } from '../src/scenarios.mjs';
 import { investigateStream } from './agent.mjs';
 import { geminiAvailable } from './gemini.mjs';
+import { createMcpClient, mcpAvailable } from './grafana-mcp.mjs';
 import { resolveStatic } from './static.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -68,8 +69,11 @@ async function handleInvestigate(req, res) {
   });
   const abort = new AbortController();
   res.on('close', () => abort.abort());
+  // Live Grafana telemetry needs the live engine: without a Gemini key the
+  // deterministic engine runs on fixture data and MCP is not dialed at all.
+  const mcp = geminiAvailable() && mcpAvailable() ? createMcpClient({ signal: abort.signal }) : undefined;
   try {
-    for await (const message of investigateStream(scenario, query, { signal: abort.signal })) {
+    for await (const message of investigateStream(scenario, query, { signal: abort.signal, mcp })) {
       if (abort.signal.aborted || res.destroyed) break;
       res.write(`event: ${message.event}\ndata: ${JSON.stringify(message.data)}\n\n`);
     }
@@ -86,7 +90,12 @@ export function startServer({ port = Number(process.env.PORT) || 8000, host = pr
     try {
       const url = new URL(req.url, 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/api/health') {
-        sendJson(res, 200, { ok: true, engine: geminiAvailable() ? 'gemini' : 'deterministic', replayAvailable: true });
+        sendJson(res, 200, {
+          ok: true,
+          engine: geminiAvailable() ? 'gemini' : 'deterministic',
+          mcp: mcpAvailable(),
+          replayAvailable: true,
+        });
         return;
       }
       if (req.method === 'POST' && url.pathname === '/api/investigate') {
