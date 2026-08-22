@@ -9,3 +9,4 @@ jobs:
         with: { node-version: '20' }
       - run: npm run lint
       - run: npm test
+      - run: npm run build

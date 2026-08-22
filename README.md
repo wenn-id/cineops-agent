@@ -27,10 +27,11 @@ a live external tool call.
 
 ```bash
 npm test
-npm start
+npm start            # builds dist/ then serves it (use start:windows on Windows)
 ```
 
-Open <http://127.0.0.1:8000>.
+Open <http://127.0.0.1:8000>. The server only exposes the built `dist/`
+directory — never the repository, `.git/`, or `.agents/`.
 
 ## Architecture
 

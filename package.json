@@ -7,7 +7,8 @@
     "lint": "node scripts/validate.mjs && node --check app.mjs && node --check src/core.mjs && node --check src/scenarios.mjs",
     "test": "node --test",
     "build": "node scripts/build.mjs",
-    "start": "python3 server.py"
+    "start": "npm run build && python3 server.py",
+    "start:windows": "npm run build && python server.py"
   },
   "engines": {
     "node": ">=20"

@@ -6,6 +6,12 @@ function requireText(value, name) {
   }
 }
 
+function requireNumber(value, name) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new TypeError(`${name} must be a finite number`);
+  }
+}
+
 function validateIncident(incident) {
   if (!incident || typeof incident !== 'object') throw new TypeError('incident is required');
   requireText(incident.title, 'incident title');
@@ -23,6 +29,31 @@ function validateIncident(incident) {
     requireText(stage.label, 'stage label');
     requireText(stage.detail, 'stage detail');
     if (!VALID_STAGE_STATUSES.has(stage.status)) throw new TypeError(`invalid stage status: ${stage.status}`);
+  }
+  for (const signal of incident.signals) {
+    requireText(signal.id, 'signal id');
+    requireText(signal.stage, 'signal stage');
+    requireText(signal.source, 'signal source');
+    requireText(signal.label, 'signal label');
+    requireText(signal.finding, 'signal finding');
+    requireText(signal.unit, 'signal unit');
+    requireText(signal.query, 'signal query');
+    requireNumber(signal.score, 'signal score');
+    requireNumber(signal.value, 'signal value');
+  }
+  if (incident.playbooks !== undefined) {
+    if (typeof incident.playbooks !== 'object' || incident.playbooks === null || Array.isArray(incident.playbooks)) {
+      throw new TypeError('incident playbooks must be an object');
+    }
+    for (const [stage, playbook] of Object.entries(incident.playbooks)) {
+      requireText(stage, 'playbook stage');
+      if (!playbook || typeof playbook !== 'object') throw new TypeError(`playbook for ${stage} is required`);
+      requireText(playbook.decision, `playbook decision for ${stage}`);
+      if (!Array.isArray(playbook.actions) || playbook.actions.length === 0) {
+        throw new TypeError(`playbook actions for ${stage} are required`);
+      }
+      for (const action of playbook.actions) requireText(action, `playbook action for ${stage}`);
+    }
   }
 }
 
@@ -55,25 +86,7 @@ export function investigateIncident(incident, query = 'What is blocking this pro
   const topSignal = evidence[0] || { stage: 'unknown', finding: 'Unknown finding' };
   const targetStage = topSignal.stage;
 
-  const playbooks = {
-    transcode: {
-      decision: 'Premiere is at risk. Pause non-premiere 4K jobs and drain the priority queue before 20:32 UTC.',
-      actions: [
-        'Pause non-premiere 4K HEVC jobs.',
-        'Route priority transcodes to the recovery pool.',
-        'Resume quality control when queue depth falls below 40 jobs.',
-      ]
-    },
-    subtitles: {
-      decision: 'Subtitle delay detected. Escalate rendering and notify ingest team.',
-      actions: [
-        'Scale subtitle worker nodes.',
-        'Restart hanging subtitle pods.'
-      ]
-    }
-  };
-
-  const playbook = playbooks[targetStage] ?? {
+  const playbook = incident.playbooks?.[targetStage] ?? {
     decision: 'Unknown failure detected. Escalate to human operator immediately.',
     actions: ['Escalate to human operator.']
   };

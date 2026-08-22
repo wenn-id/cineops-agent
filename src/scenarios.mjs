@@ -69,5 +69,22 @@ export const scenarios = {
       { tool: 'query_loki_logs', purpose: 'Correlate encoder timeout burst' },
       { tool: 'search_dashboards', purpose: 'Locate production runbook context' },
     ],
+    playbooks: {
+      transcode: {
+        decision: 'Premiere is at risk. Pause non-premiere 4K jobs and drain the priority queue before 20:32 UTC.',
+        actions: [
+          'Pause non-premiere 4K HEVC jobs.',
+          'Route priority transcodes to the recovery pool.',
+          'Resume quality control when queue depth falls below 40 jobs.',
+        ]
+      },
+      subtitles: {
+        decision: 'Subtitle delay detected. Escalate rendering and notify ingest team.',
+        actions: [
+          'Scale subtitle worker nodes.',
+          'Restart hanging subtitle pods.'
+        ]
+      }
+    },
   },
 };

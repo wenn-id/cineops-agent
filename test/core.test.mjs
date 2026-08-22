@@ -53,3 +53,63 @@ test('uses supplied operator question in investigation record', () => {
   assert.equal(result.query, query);
   assert.match(result.decision, /premiere/i);
 });
+
+test('rejects signals with missing or malformed fields', () => {
+  const base = scenarios['premiere-night'];
+  const variant = (index, patch) => ({
+    ...base,
+    signals: base.signals.map((signal, i) => (i === index ? { ...signal, ...patch } : signal)),
+  });
+
+  assert.throws(
+    () => investigateIncident(variant(0, { score: undefined })),
+    /signal score must be a finite number/i,
+  );
+  assert.throws(
+    () => investigateIncident(variant(0, { score: 'high' })),
+    /signal score must be a finite number/i,
+  );
+  assert.throws(
+    () => investigateIncident(variant(1, { value: Number.NaN })),
+    /signal value must be a finite number/i,
+  );
+  assert.throws(
+    () => investigateIncident(variant(2, { finding: ' ' })),
+    /signal finding is required/i,
+  );
+});
+
+test('rejects malformed scenario playbooks', () => {
+  const base = scenarios['premiere-night'];
+
+  assert.throws(
+    () => investigateIncident({ ...base, playbooks: { transcode: { decision: 'Ok', actions: [] } } }),
+    /playbook actions for transcode are required/i,
+  );
+  assert.throws(
+    () => investigateIncident({ ...base, playbooks: { transcode: { decision: 'Ok' } } }),
+    /playbook actions for transcode are required/i,
+  );
+});
+
+test('uses the playbook supplied by the scenario', () => {
+  const base = scenarios['premiere-night'];
+  const incident = {
+    ...base,
+    playbooks: { ...base.playbooks, transcode: { decision: 'Custom decision.', actions: ['Custom action.'] } },
+  };
+  const result = investigateIncident(incident);
+
+  assert.equal(result.decision, 'Custom decision.');
+  assert.deepEqual(result.actions, ['Custom action.']);
+});
+
+test('falls back to escalation for a stage with no playbook', () => {
+  const base = scenarios['premiere-night'];
+  const incident = { ...base, signals: [{ ...base.signals[0], stage: 'ingest' }] };
+  const result = investigateIncident(incident);
+
+  assert.equal(result.rootCause.stage, 'ingest');
+  assert.match(result.decision, /escalate to human operator/i);
+  assert.deepEqual(result.actions, ['Escalate to human operator.']);
+});
